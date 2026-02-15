@@ -71,17 +71,6 @@ describe("transformToolName", () => {
       expect(result).toBe("WebFetch")
     })
 
-    it("maps websearch to WebSearch", () => {
-      // given
-      const toolName = "websearch"
-
-      // when
-      const result = transformToolName(toolName)
-
-      // then
-      expect(result).toBe("WebSearch")
-    })
-
     it("maps todoread to TodoRead", () => {
       // given
       const toolName = "todoread"

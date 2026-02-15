@@ -18,7 +18,7 @@ import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
-import { WebsearchConfigSchema } from "./websearch"
+
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -47,7 +47,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
-  websearch: WebsearchConfigSchema.optional(),
+
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */

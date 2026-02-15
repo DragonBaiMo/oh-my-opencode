@@ -11,9 +11,7 @@ import * as commandLoader from "../features/claude-code-command-loader"
 import * as builtinCommands from "../features/builtin-commands"
 import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
-import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as pluginLoader from "../features/claude-code-plugin-loader"
-import * as mcpModule from "../mcp"
 import * as shared from "../shared"
 import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
@@ -44,8 +42,6 @@ beforeEach(() => {
   spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
   spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
 
-  spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
-
   spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
     commands: {},
     skills: {},
@@ -55,8 +51,6 @@ beforeEach(() => {
     plugins: [],
     errors: [],
   })
-
-  spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
 
   spyOn(shared, "log" as any).mockImplementation(() => {})
   spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-6"]))
@@ -90,9 +84,7 @@ afterEach(() => {
   ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
   ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
   ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
-  ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
   ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
-  ;(mcpModule.createBuiltinMcps as any)?.mockRestore?.()
   ;(shared.log as any)?.mockRestore?.()
   ;(shared.fetchAvailableModels as any)?.mockRestore?.()
   ;(shared.readConnectedProvidersCache as any)?.mockRestore?.()

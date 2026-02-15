@@ -24,6 +24,6 @@ ${PROMETHEUS_BEHAVIORAL_SUMMARY}`
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
-  webfetch: "allow" as const,
+  webfetch: "deny" as const,
   question: "allow" as const,
 }

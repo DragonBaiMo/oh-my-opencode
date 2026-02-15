@@ -1,6 +1,7 @@
 import { z } from "zod"
 
-export const McpNameSchema = z.enum(["websearch", "context7", "grep_app"])
+// Built-in MCPs have been removed. This schema is kept for backward compatibility.
+export const McpNameSchema = z.string().min(1)
 
 export type McpName = z.infer<typeof McpNameSchema>
 
