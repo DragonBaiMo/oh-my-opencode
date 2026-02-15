@@ -4,16 +4,17 @@
  * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  sisyphus: "Sisyphus (Ultraworker)",
-  atlas: "Atlas (Plan Execution Orchestrator)",
-  prometheus: "Prometheus (Plan Builder)",
-  "sisyphus-junior": "Sisyphus-Junior",
-  metis: "Metis (Plan Consultant)",
-  momus: "Momus (Plan Reviewer)",
-  oracle: "oracle",
-  librarian: "librarian",
-  explore: "explore",
-  "multimodal-looker": "multimodal-looker",
+  sisyphus: "Sisyphus (主编排器，负责任务协调和委派)",
+  hephaestus: "Hephaestus (自主深度工作者，目标导向的端到端任务执行)",
+  atlas: "Atlas (主编排器，通过task()完成todo列表中的所有任务)",
+  prometheus: "Prometheus (规划智能体，负责生成工作计划)",
+  "sisyphus-junior": "Sisyphus-Junior (聚焦任务执行器，执行委派任务)",
+  metis: "Metis (预规划分析智能体，在规划前分析用户请求)",
+  momus: "Momus (计划审查智能体，验证计划可执行性)",
+  oracle: "Oracle (只读咨询智能体，高智商推理专家)",
+  librarian: "Librarian (多仓库研究智能体，搜索远程代码库和文档)",
+  explore: "Explore (快速代码库搜索智能体)",
+  "multimodal-looker": "Multimodal-Looker (媒体分析智能体，解析PDF、图片和图表)",
 }
 
 /**
