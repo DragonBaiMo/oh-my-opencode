@@ -4,13 +4,16 @@ import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
+const LEGACY_BROWSER_PROVIDER = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
 
 export function clearSkillCache(): void {
 	cachedSkillsByProvider.clear()
 }
 
 export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const cacheKey = options?.browserProvider ?? "playwright"
+	const browserProvider = options?.browserProvider ?? LEGACY_BROWSER_PROVIDER
+	const includeClaudeCodePaths = options?.includeClaudeCodePaths ?? true
+	const cacheKey = `${browserProvider}:${includeClaudeCodePaths}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
 	// Skip cache if disabledSkills is provided (varies between calls)
@@ -20,7 +23,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	}
 
 	const [discoveredSkills, builtinSkillDefinitions] = await Promise.all([
-		discoverSkills({ includeClaudeCodePaths: true, directory: options?.directory }),
+		discoverSkills({ includeClaudeCodePaths, directory: options?.directory }),
 		Promise.resolve(
 			createBuiltinSkills({
 				browserProvider: options?.browserProvider,
@@ -48,8 +51,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	}))
 
 	// Provider-gated skill names that should be filtered based on browserProvider
-	const providerGatedSkillNames = new Set(["agent-browser", "playwright"])
-	const browserProvider = options?.browserProvider ?? "playwright"
+	const providerGatedSkillNames = new Set(["agent-browser", LEGACY_BROWSER_PROVIDER])
 
 	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
 	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {

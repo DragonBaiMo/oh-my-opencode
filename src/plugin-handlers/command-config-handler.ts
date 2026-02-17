@@ -15,6 +15,7 @@ import {
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
 import type { PluginComponents } from "./plugin-components-loader";
+import { isClaudeCodeFeatureEnabled } from "../shared/claude-code-compat";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
@@ -25,8 +26,8 @@ export async function applyCommandConfig(params: {
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands);
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
-  const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
-  const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
+  const includeClaudeCommands = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "commands");
+  const includeClaudeSkills = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "skills");
 
   const [
     configSourceSkills,

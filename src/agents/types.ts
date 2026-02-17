@@ -19,12 +19,12 @@ export type AgentFactory = ((model: string) => AgentConfig) & {
 /**
  * Agent category for grouping in Sisyphus prompt sections
  */
-export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility"
+export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility" | "testing"
 
 /**
  * Cost classification for Tool Selection table
  */
-export type AgentCost = "FREE" | "CHEAP" | "EXPENSIVE"
+export type AgentCost = "FREE" | "CHEAP" | "MODERATE" | "EXPENSIVE"
 
 /**
  * Delegation trigger for Sisyphus prompt's Delegation Table
@@ -90,6 +90,7 @@ export type BuiltinAgentName =
   | "metis"
   | "momus"
   | "atlas"
+  | "browser-tester"
 
 export type OverridableAgentName =
   | "build"

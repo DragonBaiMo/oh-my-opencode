@@ -5,6 +5,7 @@ export { createSisyphusAgent } from "./sisyphus"
 export { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 export { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 export { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
+export { createBrowserTesterAgent, BROWSER_TESTER_PROMPT_METADATA } from "./browser-tester"
 
 
 export { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"

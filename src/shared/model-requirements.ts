@@ -65,6 +65,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
   },
+  "browser-tester": {
+    fallbackChain: [
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+    ],
+  },
 }
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {

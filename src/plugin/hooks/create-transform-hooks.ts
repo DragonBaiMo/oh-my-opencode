@@ -11,6 +11,7 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "../../features/context-injector"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import { isClaudeCodeFeatureEnabled } from "../../shared/claude-code-compat"
 
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook>
@@ -28,10 +29,11 @@ export function createTransformHooks(args: {
   const { ctx, pluginConfig, isHookEnabled } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
 
+  const claudeCodeHooksEnabled = isClaudeCodeFeatureEnabled(pluginConfig.claude_code, "hooks")
   const claudeCodeHooks = createClaudeCodeHooksHook(
     ctx,
     {
-      disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+      disabledHooks: claudeCodeHooksEnabled ? undefined : true,
       keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
     },
     contextCollector,

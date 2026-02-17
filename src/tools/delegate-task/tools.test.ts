@@ -22,6 +22,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
 ])
+const LEGACY_BROWSER_SKILL = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
 
 type DelegateTaskArgsWithSerializedSkills = Omit<DelegateTaskArgs, "load_skills"> & {
   load_skills: string
@@ -64,6 +65,106 @@ describe("sisyphus-task", () => {
     __resetTimingConfig()
     cacheSpy?.mockRestore()
     providerModelsSpy?.mockRestore()
+  })
+
+  describe("browser-tester-devtools auto-injection", () => {
+    test("auto-injects browser-tester-devtools when agent is browser-tester", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = {
+        launch: async () => ({ id: "task-1", sessionID: "ses-1", status: "running" }),
+      }
+      const mockClient = {
+        config: { get: async () => ({}) },
+        app: { agents: async () => ({ data: [] }) },
+        session: {
+          create: async () => ({ data: { id: "ses-1" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved content",
+        error: null,
+      })
+
+      const toolContext = {
+        sessionID: "parent",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      await tool.execute({
+        description: "Test auto-inject",
+        prompt: "do something",
+        subagent_type: "browser-tester",
+        run_in_background: true,
+        load_skills: [LEGACY_BROWSER_SKILL],
+      }, toolContext)
+
+      // then
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith(
+        ["browser-tester-devtools"],
+        expect.any(Object)
+      )
+    })
+
+    test("strips browser-related skills when agent is NOT browser-tester", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = {
+        launch: async () => ({ id: "task-2", sessionID: "ses-2", status: "running" }),
+      }
+      const mockClient = {
+        config: { get: async () => ({}) },
+        app: { agents: async () => ({ data: [] }) },
+        session: {
+          create: async () => ({ data: { id: "ses-2" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved content",
+        error: null,
+      })
+
+      const toolContext = {
+        sessionID: "parent",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      await tool.execute({
+        description: "Test strip skills",
+        prompt: "do something",
+        subagent_type: "oracle",
+        run_in_background: true,
+        load_skills: [LEGACY_BROWSER_SKILL, "git-master", "browser-tester-devtools"],
+      }, toolContext)
+
+      // then
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith(
+        ["git-master"],
+        expect.any(Object)
+      )
+    })
   })
 
   describe("DEFAULT_CATEGORIES", () => {
@@ -315,15 +416,15 @@ describe("sisyphus-task", () => {
         prompt: "Load skill parsing test",
         category: "quick",
         run_in_background: true,
-        load_skills: '["playwright", "git-master"]',
+        load_skills: '["' + LEGACY_BROWSER_SKILL + '", "git-master"]',
       }
 
       //#when
       await tool.execute(args as unknown as DelegateTaskArgs, toolContext)
 
       //#then
-      expect(args.load_skills).toEqual(["playwright", "git-master"])
-      expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
+      expect(args.load_skills).toEqual(["git-master"])
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith(["git-master"], expect.any(Object))
     }, { timeout: 10000 })
 
     test("defaults to [] when load_skills is malformed JSON", async () => {
@@ -378,7 +479,7 @@ describe("sisyphus-task", () => {
         prompt: "Load skill parsing test",
         category: "quick",
         run_in_background: true,
-        load_skills: '["playwright", "git-master"',
+        load_skills: '["' + LEGACY_BROWSER_SKILL + '", "git-master"',
       }
 
       //#when

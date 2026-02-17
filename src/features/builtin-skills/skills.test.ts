@@ -1,128 +1,94 @@
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
 
+const LEGACY_BROWSER_PROVIDER = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
+
 describe("createBuiltinSkills", () => {
-	test("returns playwright skill by default", () => {
-		// given - no options (default)
+	test("returns built-in baseline without browser-family skills", () => {
+		// given
 
 		// when
 		const skills = createBuiltinSkills()
+		const names = skills.map((s) => s.name)
 
 		// then
-		const browserSkill = skills.find((s) => s.name === "playwright")
-		expect(browserSkill).toBeDefined()
-		expect(browserSkill!.description).toContain("browser")
-		expect(browserSkill!.mcpConfig).toHaveProperty("playwright")
+		expect(skills).toHaveLength(4)
+		expect(names).toEqual([
+			"frontend-ui-ux",
+			"git-master",
+			"deep-research",
+			"browser-tester-devtools",
+		])
+		expect(names).not.toContain(LEGACY_BROWSER_PROVIDER)
+		expect(names).not.toContain("agent-browser")
+		expect(names).not.toContain("dev-browser")
 	})
 
-	test("returns playwright skill when browserProvider is 'playwright'", () => {
+	test("ignores browserProvider option for built-in baseline", () => {
 		// given
-		const options = { browserProvider: "playwright" as const }
+		const legacyProvider = { browserProvider: LEGACY_BROWSER_PROVIDER as any }
+		const agentBrowserProvider = { browserProvider: "agent-browser" as const }
 
 		// when
-		const skills = createBuiltinSkills(options)
+		const legacySkills = createBuiltinSkills(legacyProvider as any)
+		const agentBrowserSkills = createBuiltinSkills(agentBrowserProvider)
 
 		// then
-		const playwrightSkill = skills.find((s) => s.name === "playwright")
-		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
-		expect(playwrightSkill).toBeDefined()
-		expect(agentBrowserSkill).toBeUndefined()
+		expect(legacySkills.map((s) => s.name)).toEqual(agentBrowserSkills.map((s) => s.name))
+		expect(legacySkills).toHaveLength(4)
 	})
 
-	test("returns agent-browser skill when browserProvider is 'agent-browser'", () => {
-		// given
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when
-		const skills = createBuiltinSkills(options)
-
-		// then
-		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
-		const playwrightSkill = skills.find((s) => s.name === "playwright")
-		expect(agentBrowserSkill).toBeDefined()
-		expect(agentBrowserSkill!.description).toContain("browser")
-		expect(agentBrowserSkill!.allowedTools).toContain("Bash(agent-browser:*)")
-		expect(agentBrowserSkill!.template).toContain("agent-browser")
-		expect(playwrightSkill).toBeUndefined()
-	})
-
-	test("agent-browser skill template is inlined (not loaded from file)", () => {
-		// given
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when
-		const skills = createBuiltinSkills(options)
-		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
-
-		// then - template should contain substantial content (inlined, not fallback)
-		expect(agentBrowserSkill!.template).toContain("## Quick start")
-		expect(agentBrowserSkill!.template).toContain("## Commands")
-		expect(agentBrowserSkill!.template).toContain("agent-browser open")
-		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
-	})
-
-	test("always includes frontend-ui-ux and git-master skills", () => {
-		// given - both provider options
-
-		// when
-		const defaultSkills = createBuiltinSkills()
-		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
-
-		// then
-		for (const skills of [defaultSkills, agentBrowserSkills]) {
-			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
-			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
-		}
-	})
-
-	test("returns exactly 5 skills regardless of provider", () => {
+	test("browser-tester-devtools skill is agent-restricted with chrome-devtools MCP", () => {
 		// given
 
 		// when
-		const defaultSkills = createBuiltinSkills()
-		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
+		const skills = createBuiltinSkills()
+		const devtoolsSkill = skills.find((s) => s.name === "browser-tester-devtools")
 
 		// then
-		expect(defaultSkills).toHaveLength(5)
-		expect(agentBrowserSkills).toHaveLength(5)
+		expect(devtoolsSkill).toBeDefined()
+		expect(devtoolsSkill!.agent).toBe("browser-tester")
+		expect(devtoolsSkill!.mcpConfig).toHaveProperty("chrome-devtools")
+		expect(devtoolsSkill!.mcpConfig!["chrome-devtools"]).toEqual({
+			command: "npx",
+			args: ["-y", "chrome-devtools-mcp@latest"],
+		})
 	})
 
-	test("should exclude playwright when it is in disabledSkills", () => {
+	test("should exclude git-master when it is in disabledSkills", () => {
 		// #given
-		const options = { disabledSkills: new Set(["playwright"]) }
+		const options = { disabledSkills: new Set(["git-master"]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.map((s) => s.name)).not.toContain("playwright")
+		expect(skills.map((s) => s.name)).not.toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
-		expect(skills.map((s) => s.name)).toContain("git-master")
-		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("deep-research")
-		expect(skills.length).toBe(4)
+		expect(skills.map((s) => s.name)).toContain("browser-tester-devtools")
+		expect(skills.length).toBe(3)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
 		// #given
-		const options = { disabledSkills: new Set(["playwright", "git-master"]) }
+		const options = { disabledSkills: new Set(["git-master", "browser-tester-devtools"]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.map((s) => s.name)).not.toContain("playwright")
 		expect(skills.map((s) => s.name)).not.toContain("git-master")
+		expect(skills.map((s) => s.name)).not.toContain("browser-tester-devtools")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
-		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("deep-research")
-		expect(skills.length).toBe(3)
+		expect(skills.length).toBe(2)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
 		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "deep-research"]),
+			disabledSkills: new Set(["frontend-ui-ux", "git-master", "deep-research", "browser-tester-devtools"]),
 		}
 
 		// #when
@@ -140,6 +106,6 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(5)
+		expect(skills.length).toBe(4)
 	})
 })

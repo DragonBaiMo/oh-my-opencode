@@ -156,6 +156,17 @@ describe("skill tool - agent restriction", () => {
     )
   })
 
+  it("blocks browser-tester-devtools for non-browser-tester agent", async () => {
+    // given
+    const tool = createSkillTool()
+    const context = { ...mockContext, agent: "oracle" }
+
+    // when / #then
+    await expect(tool.execute({ name: "browser-tester-devtools" }, context)).rejects.toThrow(
+      'Skill "browser-tester-devtools" is restricted to agent "browser-tester"'
+    )
+  })
+
 })
 
 describe("skill tool - MCP schema display", () => {

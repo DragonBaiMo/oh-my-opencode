@@ -2,6 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { mergeCategories } from "../../shared/merge-categories"
+import { BROWSER_AUTOMATION_PROVIDERS } from "../../shared/browser-automation-provider"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -19,6 +20,15 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+
+const BROWSER_TESTER_AGENT = "browser-tester"
+const BROWSER_TESTER_DEVTOOLS_SKILL = "browser-tester-devtools"
+
+const BROWSER_SKILLS: string[] = [...BROWSER_AUTOMATION_PROVIDERS]
+
+function normalizeAgentName(agent?: string): string {
+  return agent?.trim().toLowerCase() ?? ""
+}
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
@@ -56,7 +66,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
 MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
 
-- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["git-master"], ["git-master", "frontend-ui-ux"]).
 - category: Use predefined category → Spawns Sisyphus-Junior with category config
   Available categories:
 ${categoryList}
@@ -75,7 +85,7 @@ Prompts MUST be in English.`
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"git-master\"], [\"frontend-ui-ux\"] for best results."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
@@ -112,10 +122,21 @@ Prompts MUST be in English.`
         }
       }
       if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
+        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["git-master"], ["frontend-ui-ux"] for best results.`)
       }
       if (args.load_skills === null) {
         throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
+      }
+
+      const targetAgent = normalizeAgentName(args.subagent_type)
+      if (targetAgent === BROWSER_TESTER_AGENT) {
+        args.load_skills = args.load_skills.filter(s => !BROWSER_SKILLS.includes(s))
+        if (!args.load_skills.includes(BROWSER_TESTER_DEVTOOLS_SKILL)) {
+          args.load_skills = [...args.load_skills, BROWSER_TESTER_DEVTOOLS_SKILL]
+        }
+      } else {
+        const forbiddenSkills = [...BROWSER_SKILLS, BROWSER_TESTER_DEVTOOLS_SKILL]
+        args.load_skills = args.load_skills.filter(s => !forbiddenSkills.includes(s))
       }
 
       const runInBackground = args.run_in_background === true
@@ -124,6 +145,8 @@ Prompts MUST be in English.`
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
+        directory: options.directory,
+        targetAgent,
       })
       if (skillError) {
         return skillError

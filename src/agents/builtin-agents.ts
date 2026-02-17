@@ -12,8 +12,9 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createBrowserTesterAgent, BROWSER_TESTER_PROMPT_METADATA } from "./browser-tester"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
-import { fetchAvailableModels, readConnectedProvidersCache } from "../shared"
+import { fetchAvailableModels, readConnectedProvidersCache, getAgentDisplayName } from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
@@ -37,6 +38,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  "browser-tester": createBrowserTesterAgent,
 }
 
 /**
@@ -51,6 +53,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+  "browser-tester": BROWSER_TESTER_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(

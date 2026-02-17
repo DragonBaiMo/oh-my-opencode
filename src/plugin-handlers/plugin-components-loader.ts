@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { addConfigLoadError, log } from "../shared";
+import { isClaudeCodeFeatureEnabled } from "../shared/claude-code-compat";
 
 export type PluginComponents = {
   commands: Record<string, unknown>;
@@ -25,7 +26,7 @@ const EMPTY_PLUGIN_COMPONENTS: PluginComponents = {
 export async function loadPluginComponents(params: {
   pluginConfig: OhMyOpenCodeConfig;
 }): Promise<PluginComponents> {
-  const pluginsEnabled = params.pluginConfig.claude_code?.plugins ?? true;
+  const pluginsEnabled = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "plugins");
   if (!pluginsEnabled) {
     return EMPTY_PLUGIN_COMPONENTS;
   }

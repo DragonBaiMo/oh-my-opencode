@@ -1,6 +1,8 @@
 import { z } from "zod"
 
 export const ClaudeCodeConfigSchema = z.object({
+  /** Master switch to disable ALL Claude Code compatibility features */
+  enabled: z.boolean().optional(),
   mcp: z.boolean().optional(),
   commands: z.boolean().optional(),
   skills: z.boolean().optional(),

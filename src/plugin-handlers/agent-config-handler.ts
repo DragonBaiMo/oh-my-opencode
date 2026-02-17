@@ -1,7 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, migrateAgentConfig } from "../shared";
+import { log, migrateAgentConfig, getAgentDisplayName } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import {
   discoverConfigSourceSkills,
@@ -15,6 +15,7 @@ import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
+import { isClaudeCodeFeatureEnabled } from "../shared/claude-code-compat";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -33,7 +34,7 @@ export async function applyAgentConfig(params: {
     },
   ) as typeof params.pluginConfig.disabled_agents;
 
-  const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
+  const includeClaudeSkillsForAwareness = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "skills");
   const [
     discoveredConfigSourceSkills,
     discoveredUserSkills,
@@ -82,7 +83,7 @@ export async function applyAgentConfig(params: {
     useTaskSystem,
   );
 
-  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
+  const includeClaudeAgents = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "agents");
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
   const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
 
