@@ -23,7 +23,7 @@
     const resp = await fetch(`${BASE_URL}/v1/chat/completions`, {
       method: "POST",
       body: JSON.stringify({
-        model: "grok-4",
+        model: "grok-4.1-thinking",
         messages: history,   // 关键：每轮携带历史，实现续聊
         stream: false
       })
