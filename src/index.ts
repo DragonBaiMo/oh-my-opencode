@@ -10,7 +10,7 @@ import { createPluginInterface } from "./plugin-interface"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
-import { injectServerAuthIntoClient, log } from "./shared"
+import { deployDeepResearchScript, injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -20,6 +20,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
+
+  try {
+    const deploymentResult = await deployDeepResearchScript()
+    log("[OhMyOpenCodePlugin] deep-research deployment check", deploymentResult)
+  } catch (error) {
+    log("[OhMyOpenCodePlugin] deep-research deployment failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
