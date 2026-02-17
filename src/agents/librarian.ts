@@ -70,9 +70,23 @@ Classify EVERY request into one of these categories before taking action:
 
 **When to use**: TYPE A (Conceptual) and TYPE D (Comprehensive) questions about libraries, frameworks, APIs, best practices.
 
-**How to call**:
+**Model selection rule**:
+- Use \`grok-4.1-thinking\` by default.
+- Use \`grok-4.1-thinking.1-expert\` only for truly hard requests (ambiguous architecture trade-offs, conflicting sources, or multi-step deep analysis).
+- Only \`grok-4.1-thinking.1-expert\` supports conversation follow-up via \`conversation_id\`.
+- If previous call used non-heavy model, follow-up MUST restart as a new heavy call.
+
+**Before calling tool, output only this JSON**:
+\`\`\`json
+{
+  "selected_model": "grok-4.1-thinking | grok-4.1-thinking.1-expert",
+  "research_prompt": "exact prompt to send"
+}
+\`\`\`
+
+**How to call** (use bash tool):
 \`\`\`bash
-node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "你的具体问题"
+node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "你的具体问题"
 \`\`\`
 
 **Good questions for Deep Research**:
@@ -81,19 +95,25 @@ node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "你的具体问题"
 - "Next.js 15 App Router 与 Pages Router 的区别和迁移方法"
 - "Prisma ORM 关联查询的性能优化技巧"
 
-**Environment requirements** (must be configured):
-- \`DEEP_RESEARCH_API_URL\`: API endpoint
-- \`DEEP_RESEARCH_API_KEY\`: API key
-- \`DEEP_RESEARCH_MODEL\`: Model name (optional)
-
-**Response format**:
+**Response format** (JSON):
 \`\`\`json
 {
   "success": true,
-  "answer": "调研结果...",
-  "model": "model-name",
-  "usage": { "prompt_tokens": 100, "completion_tokens": 500 }
+  "selected_model": "grok-4.1-thinking",
+  "research_prompt": "...",
+  "answer": "调研结果..."
 }
+\`\`\`
+
+**Follow-up rule (MANDATORY)**:
+- Follow-up is allowed only when selected_model is \`grok-4.1-thinking.1-expert\`.
+- In that case, reuse \`conversation_id\`:
+\`\`\`bash
+node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --conversation "<conversation_id>" --model "grok-4.1-thinking.1-expert" --prompt "follow-up question"
+\`\`\`
+- If previous call was \`grok-4.1-thinking\`, do NOT continue by id. Start a new heavy call:
+\`\`\`bash
+node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking.1-expert" --prompt "restate context + follow-up"
 \`\`\`
 
 ---
@@ -106,7 +126,10 @@ node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "你的具体问题"
 **Execute Deep Research FIRST**, then verify with source:
 \`\`\`
 Step 1: Deep Research for documentation/best practices
-        node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "具体问题"
+        1) choose model (grok-4.1-thinking default, heavy only if really hard)
+        2) output JSON with selected_model + research_prompt
+        3) node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "<selected_model>" --prompt "<research_prompt>"
+        4) if selected_model is grok-4.1-thinking.1-expert and follow-up needed, reuse conversation_id sequentially (never parallel)
 
 Step 2: Clone repo to verify and find examples
         gh repo clone owner/repo \${TMPDIR:-/tmp}/repo-name -- --depth 1
@@ -174,19 +197,22 @@ gh api repos/owner/repo/pulls/<number>/files
 ### TYPE D: COMPREHENSIVE RESEARCH
 **Trigger**: Complex questions, ambiguous requests, "deep dive into..."
 
-**Execute Deep Research + Source Analysis in parallel**:
-\`\`\`
-// Documentation & Best Practices
-Tool 1: node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "comprehensive question"
+**Execution order (MANDATORY)**:
+- Step 1 (sequential, main-thread only): run deep-research.mjs first.
+- Step 2: after deep-research finishes, continue source analysis.
 
-// Source Analysis
+\`\`\`
+// Step 1: Documentation & Best Practices (must be sequential)
+Tool 1: node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking.1-expert" --prompt "comprehensive question"
+
+// Step 2: Source Analysis (can run after step 1)
 Tool 2: gh repo clone owner/repo \${TMPDIR:-/tmp}/repo -- --depth 1
 
-// Code Search
+// Step 3: Code Search
 Tool 3: gh search code "pattern1" --repo owner/repo
 Tool 4: gh search code "pattern2" --repo owner/repo
 
-// Context
+// Step 4: Context
 Tool 5: gh search issues "topic" --repo owner/repo
 \`\`\`
 
@@ -241,7 +267,7 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 
 | Purpose | Tool | Command/Usage |
 |---------|------|---------------|
-| **Documentation/Best Practices** | Deep Research | \`node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "question"\` |
+| **Documentation/Best Practices** | Deep Research (mjs, main-thread only) | \`node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "question"\` |
 | **Clone Repo** | gh CLI | \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\` |
 | **Code Search** | gh CLI | \`gh search code "query" --repo owner/repo\` |
 | **Issues/PRs** | gh CLI | \`gh search issues/prs "query" --repo owner/repo\` |
@@ -268,10 +294,12 @@ Use OS-appropriate temp directory:
 
 | Request Type | Suggested Calls |
 |--------------|-----------------|
-| TYPE A (Conceptual) | Deep Research + 1-2 gh calls |
+| TYPE A (Conceptual) | Deep Research first (sequential), then 1-2 gh calls |
 | TYPE B (Implementation) | 2-3 gh calls |
 | TYPE C (Context) | 2-3 gh calls |
-| TYPE D (Comprehensive) | Deep Research + 3-5 gh calls |
+| TYPE D (Comprehensive) | Deep Research first (sequential), then 3-5 gh calls |
+
+**Hard rule**: deep-research.mjs must never be executed in parallel.
 
 ---
 

@@ -25,13 +25,56 @@ description: "深度调研工具 - 通过外部 AI 平台进行深度技术调�
 使用 bash 工具执行深度调研脚本：
 
 ```bash
-node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "<你的问题>"
+node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "<你的问题>"
 ```
 
-**环境变量要求**：
-- `DEEP_RESEARCH_API_URL`: OpenAI 兼容 API 的 baseURL（必需）
-- `DEEP_RESEARCH_API_KEY`: API 密钥（必需）
-- `DEEP_RESEARCH_MODEL`: 模型名称（可选，默认 gpt-4o）
+**模型限制（强制）**：
+- 只允许 `grok-4.1-thinking` 和 `grok-4.1-thinking.1-expert`
+- 默认使用 `grok-4.1-thinking`
+- 仅当问题特别复杂时使用 `grok-4.1-thinking.1-expert`
+- 只有 `grok-4.1-thinking.1-expert` 允许基于 `conversation_id` 续问
+
+**环境变量**：
+- `DEEP_RESEARCH_API_URL`：默认 `http://45.192.97.104:5432`
+- `DEEP_RESEARCH_API_KEY`：必须设置
+- `DEEP_RESEARCH_DEFAULT_MODEL`：默认模型（建议 `grok-4.1-thinking`）
+
+## 调用前输出格式
+
+在真正调用脚本前，先输出：
+
+```json
+{
+  "selected_model": "grok-4.1-thinking | grok-4.1-thinking.1-expert",
+  "research_prompt": "要发送的完整调研提示词"
+}
+```
+
+然后再调用脚本。
+
+## 对话续问（Conversation ID）
+
+仅 `grok-4.1-thinking.1-expert` 首次调用会返回 `conversation_id`（同 `conversation_uuid`）。
+
+```bash
+node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "首轮问题"
+```
+
+续问时必须复用该 ID，且模型必须仍为 heavy：
+
+```bash
+node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --conversation "<conversation_id>" --model "grok-4.1-thinking.1-expert" --prompt "追问问题"
+```
+
+如果前一次是 `grok-4.1-thinking`，则不允许按 conversation 续问；必须重开一次 heavy 调用并带上上下文。
+
+若 heavy 实际执行被上游降级为非 heavy（返回 `actual_model` 非 `grok-4.1-thinking.1-expert` 或 `restart_required: true`），
+该会话 ID 会被自动禁用，后续必须重开新 heavy 调用。
+
+## 主线程串行调用（强制）
+
+deep-research.mjs 仅允许主线程串行调用，不允许并行运行。
+如果并发触发，会直接返回错误并拒绝执行。
 
 ## 执行流程
 
@@ -65,6 +108,38 @@ node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "<你的问题>"
 ❌ "帮我写一个登录页面" （这是实现任务，不是调研）
 ```
 
+### 参考问问题的格式
+
+```md
+## 调研主题
+我正在进行 {任务描述}，遇到以下技术问题：[一句话描述核心问题]
+
+## 上下文背景
+【背景】{上下文背景} [当前任务、为什么需要这个信息、已知相关信息]
+
+## 相关伪代码
+
+    ```pseudo
+    【当前代码逻辑】[简化代码逻辑，展示问题所在位置]
+    [用 // ← 不确定 标注关键位置]
+
+    ```
+
+## 技术约束
+【技术环境】
+- 技术栈：[语言/框架/版本]（如有）
+- 运行环境：[OS/平台/依赖]（如有）
+- 已有限制：[必须遵守的约束]（如有）
+
+## 待澄清问题
+1. [具体问题 1]
+2. [具体问题 2]
+{待澄清问题列表}
+
+## 期望输出
+请提供 {期望输出}。如有多种方案，请说明优缺点和适用场景:[代码示例/配置方式/最佳实践/对比分析等]
+
+```
 ## 结果处理
 
 调研结果会以 JSON 格式返回，包含：
@@ -72,9 +147,22 @@ node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" "<你的问题>"
 ```json
 {
   "success": true,
+  "selected_model": "grok-4.1-thinking",
+  "research_prompt": "发送的提示词",
   "answer": "调研结果内容...",
-  "model": "使用的模型",
   "usage": { "prompt_tokens": 100, "completion_tokens": 500 }
+}
+```
+
+heavy 首次调用示例：
+
+```json
+{
+  "success": true,
+  "conversation_id": "uuid",
+  "selected_model": "grok-4.1-thinking.1-expert",
+  "research_prompt": "发送的提示词",
+  "answer": "调研结果内容..."
 }
 ```
 
