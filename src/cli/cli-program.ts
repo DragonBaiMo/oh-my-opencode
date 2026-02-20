@@ -44,7 +44,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
-  Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
+   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
 `)
   .action(async (options) => {
@@ -67,20 +67,20 @@ program
    .command("run <message>")
    .allowUnknownOption()
    .passThroughOptions()
-   .description("Run opencode with todo/background task completion enforcement")
+  .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
-  .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
   .option("--json", "Output structured JSON result to stdout")
+  .option("--no-timestamp", "Disable timestamp prefix in run output")
+  .option("--verbose", "Show full event stream (default: messages/tools only)")
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
-  $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
   $ bunx oh-my-opencode run --port 4321 "Fix the bug"
   $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
@@ -109,11 +109,12 @@ Unlike 'opencode run', this command waits until:
       message,
       agent: options.agent,
       directory: options.directory,
-      timeout: options.timeout,
       port: options.port,
       attach: options.attach,
       onComplete: options.onComplete,
       json: options.json ?? false,
+      timestamp: options.timestamp ?? true,
+      verbose: options.verbose ?? false,
       sessionId: options.sessionId,
     }
     const exitCode = await run(runOptions)

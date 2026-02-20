@@ -11,8 +11,8 @@ describe("Agent Config Integration", () => {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         Atlas: { model: "anthropic/claude-opus-4-6" },
         "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
-        "Metis (Plan Consultant)": { model: "anthropic/claude-sonnet-4-5" },
-        "Momus (Plan Reviewer)": { model: "anthropic/claude-sonnet-4-5" },
+        "Metis (Plan Consultant)": { model: "anthropic/claude-sonnet-4-6" },
+        "Momus (Plan Reviewer)": { model: "anthropic/claude-sonnet-4-6" },
       }
 
       // when - migration is applied
@@ -46,7 +46,7 @@ describe("Agent Config Integration", () => {
       const config = {
         sisyphus: { model: "anthropic/claude-opus-4-6" },
         oracle: { model: "openai/gpt-5.2" },
-        librarian: { model: "opencode/glm-4.7-free" },
+        librarian: { model: "opencode/big-pickle" },
       }
 
       // when - migration is applied
@@ -65,7 +65,7 @@ describe("Agent Config Integration", () => {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         oracle: { model: "openai/gpt-5.2" },
         "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
-        librarian: { model: "opencode/glm-4.7-free" },
+        librarian: { model: "opencode/big-pickle" },
       }
 
       // when - migration is applied
@@ -92,15 +92,15 @@ describe("Agent Config Integration", () => {
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
 
       // then - display names are correct
-      expect(displayNames).toContain("Sisyphus (主编排器，负责任务协调和委派)")
-      expect(displayNames).toContain("Atlas (主编排器，通过task()完成todo列表中的所有任务)")
-      expect(displayNames).toContain("Prometheus (规划智能体，负责生成工作计划)")
-      expect(displayNames).toContain("Metis (预规划分析智能体，在规划前分析用户请求)")
-      expect(displayNames).toContain("Momus (计划审查智能体，验证计划可执行性)")
-      expect(displayNames).toContain("Oracle (只读咨询智能体，高智商推理专家)")
-      expect(displayNames).toContain("Librarian (多仓库研究智能体，搜索远程代码库和文档)")
-      expect(displayNames).toContain("Explore (快速代码库搜索智能体)")
-      expect(displayNames).toContain("Multimodal-Looker (媒体分析智能体，解析PDF、图片和图表)")
+      expect(displayNames).toContain("Sisyphus (Ultraworker)")
+      expect(displayNames).toContain("Atlas (Plan Executor)")
+      expect(displayNames).toContain("Prometheus (Plan Builder)")
+      expect(displayNames).toContain("Metis (Plan Consultant)")
+      expect(displayNames).toContain("Momus (Plan Critic)")
+      expect(displayNames).toContain("oracle")
+      expect(displayNames).toContain("librarian")
+      expect(displayNames).toContain("explore")
+      expect(displayNames).toContain("multimodal-looker")
     })
 
     test("handles lowercase keys case-insensitively", () => {
@@ -111,12 +111,12 @@ describe("Agent Config Integration", () => {
       const displayNames = keys.map((key) => getAgentDisplayName(key))
 
       // then - correct display names are returned
-      expect(displayNames[0]).toBe("Sisyphus (主编排器，负责任务协调和委派)")
-      expect(displayNames[1]).toBe("Atlas (主编排器，通过task()完成todo列表中的所有任务)")
-      expect(displayNames[2]).toBe("Sisyphus (主编排器，负责任务协调和委派)")
-      expect(displayNames[3]).toBe("Atlas (主编排器，通过task()完成todo列表中的所有任务)")
-      expect(displayNames[4]).toBe("Prometheus (规划智能体，负责生成工作计划)")
-      expect(displayNames[5]).toBe("Prometheus (规划智能体，负责生成工作计划)")
+      expect(displayNames[0]).toBe("Sisyphus (Ultraworker)")
+      expect(displayNames[1]).toBe("Atlas (Plan Executor)")
+      expect(displayNames[2]).toBe("Sisyphus (Ultraworker)")
+      expect(displayNames[3]).toBe("Atlas (Plan Executor)")
+      expect(displayNames[4]).toBe("Prometheus (Plan Builder)")
+      expect(displayNames[5]).toBe("Prometheus (Plan Builder)")
     })
 
     test("returns original key for unknown agents", () => {
@@ -218,7 +218,7 @@ describe("Agent Config Integration", () => {
 
       // then - display names are correct
       expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
-      expect(atlasDisplay).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(atlasDisplay).toBe("Atlas (Plan Executor)")
     })
   })
 })

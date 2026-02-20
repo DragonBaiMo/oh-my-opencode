@@ -90,7 +90,6 @@ export type BuiltinAgentName =
   | "metis"
   | "momus"
   | "atlas"
-  | "browser-tester"
 
 export type OverridableAgentName =
   | "build"

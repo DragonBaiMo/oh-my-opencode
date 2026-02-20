@@ -1,8 +1,9 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, migrateAgentConfig, getAgentDisplayName } from "../shared";
+import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
+import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -13,6 +14,7 @@ import {
 import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
+import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 import { isClaudeCodeFeatureEnabled } from "../shared/claude-code-compat";
@@ -21,6 +23,14 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
 };
+
+function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
+  const defaultAgent = config.default_agent;
+  if (typeof defaultAgent !== "string") return undefined;
+
+  const trimmedDefaultAgent = defaultAgent.trim();
+  return trimmedDefaultAgent.length > 0 ? trimmedDefaultAgent : undefined;
+}
 
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
@@ -67,6 +77,7 @@ export async function applyAgentConfig(params: {
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
+  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -81,6 +92,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
+    disableOmoEnv,
   );
 
   const includeClaudeAgents = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "agents");
@@ -101,11 +113,18 @@ export async function applyAgentConfig(params: {
   const plannerEnabled = params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
   const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
+  const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    (params.config as { default_agent?: string }).default_agent = "sisyphus";
+    if (configuredDefaultAgent) {
+      (params.config as { default_agent?: string }).default_agent =
+        getAgentDisplayName(configuredDefaultAgent);
+    } else {
+      (params.config as { default_agent?: string }).default_agent =
+        getAgentDisplayName("sisyphus");
+    }
 
     const agentConfig: Record<string, unknown> = {
       sisyphus: builtinAgents.sisyphus,
@@ -194,6 +213,9 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    params.config.agent = remapAgentKeysToDisplayNames(
+      params.config.agent as Record<string, unknown>,
+    );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
     );

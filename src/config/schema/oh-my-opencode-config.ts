@@ -18,6 +18,7 @@ import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
+import { WebsearchConfigSchema } from "./websearch"
 
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -33,6 +34,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
+  /** Enable hashline_edit tool/hook integrations (default: true at call site) */
+  hashline_edit: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
@@ -47,6 +50,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
+  websearch: WebsearchConfigSchema.optional(),
 
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),

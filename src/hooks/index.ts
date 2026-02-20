@@ -27,8 +27,11 @@ export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
+export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
+export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
+export { createJsonErrorRecoveryHook } from "./json-error-recovery";
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
 export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
@@ -43,3 +46,6 @@ export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
+export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
+export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
+

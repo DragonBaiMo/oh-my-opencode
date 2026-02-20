@@ -25,7 +25,7 @@ export function createLibrarianAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
-    "task",
+    "apply_patch",
     "task",
     "call_omo_agent",
   ])
@@ -265,6 +265,8 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 
 ### Primary Tools by Purpose
 
+<<<<<<< HEAD
+| Purpose | Tool | Command/Usage |
 | Purpose | Tool | Command/Usage |
 |---------|------|---------------|
 | **Documentation/Best Practices** | Deep Research (mjs, main-thread only) | \`node "\${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "question"\` |

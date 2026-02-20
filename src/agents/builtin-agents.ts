@@ -12,9 +12,12 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
-import { createBrowserTesterAgent, BROWSER_TESTER_PROMPT_METADATA } from "./browser-tester"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
-import { fetchAvailableModels, readConnectedProvidersCache, getAgentDisplayName } from "../shared"
+import {
+  fetchAvailableModels,
+  readConnectedProvidersCache,
+  readProviderModelsCache,
+} from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
@@ -38,7 +41,6 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
-  "browser-tester": createBrowserTesterAgent,
 }
 
 /**
@@ -53,7 +55,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
-  "browser-tester": BROWSER_TESTER_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -68,17 +69,25 @@ export async function createBuiltinAgents(
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
-  useTaskSystem = false
+  useTaskSystem = false,
+  disableOmoEnv = false
 ): Promise<Record<string, AgentConfig>> {
+
   const connectedProviders = readConnectedProvidersCache()
+  const providerModelsConnected = connectedProviders
+    ? (readProviderModelsCache()?.connected ?? [])
+    : []
+  const mergedConnectedProviders = Array.from(
+    new Set([...(connectedProviders ?? []), ...providerModelsConnected])
+  )
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
-    connectedProviders: connectedProviders ?? undefined,
+    connectedProviders: mergedConnectedProviders.length > 0 ? mergedConnectedProviders : undefined,
   })
   const isFirstRunNoCache =
-    availableModels.size === 0 && (!connectedProviders || connectedProviders.length === 0)
+    availableModels.size === 0 && mergedConnectedProviders.length === 0
 
   const result: Record<string, AgentConfig> = {}
 
@@ -105,6 +114,7 @@ export async function createBuiltinAgents(
     uiSelectedModel,
     availableModels,
     disabledSkills,
+    disableOmoEnv,
   })
 
   const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
@@ -138,6 +148,7 @@ export async function createBuiltinAgents(
     directory,
     userCategories: categories,
     useTaskSystem,
+    disableOmoEnv,
   })
   if (sisyphusConfig) {
     result["sisyphus"] = sisyphusConfig
@@ -155,6 +166,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     useTaskSystem,
+    disableOmoEnv,
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig

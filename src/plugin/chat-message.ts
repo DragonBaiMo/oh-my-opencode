@@ -1,15 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import {
-  applyAgentVariant,
-  resolveAgentVariant,
-  resolveVariantForModel,
-} from "../shared/agent-variant"
 import { hasConnectedProvidersCache } from "../shared"
-import {
-  setSessionAgent,
-} from "../features/claude-code-session-state"
+import { setSessionAgent } from "../features/claude-code-session-state"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -56,29 +50,15 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      const variant =
-        input.model && input.agent
-          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-          : resolveAgentVariant(pluginConfig, input.agent)
-      if (variant !== undefined) {
-        message["variant"] = variant
-      }
       firstMessageVariantGate.markApplied(input.sessionID)
-    } else {
-      if (input.model && input.agent && message["variant"] === undefined) {
-        const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
-        if (variant !== undefined) {
-          message["variant"] = variant
-        }
-      } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
-      }
     }
 
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
+    await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
+    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
@@ -135,5 +115,7 @@ export function createChatMessageHandler(args: {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }
+
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui, input.sessionID)
   }
 }

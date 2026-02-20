@@ -33,9 +33,12 @@ export const HookNameSchema = z.enum([
   "claude-code-hooks",
   "auto-slash-command",
   "edit-error-recovery",
+  "json-error-recovery",
   "delegate-task-retry",
   "prometheus-md-only",
   "sisyphus-junior-notepad",
+  "no-sisyphus-gpt",
+  "no-hephaestus-non-gpt",
   "start-work",
   "atlas",
   "unstable-agent-babysitter",
@@ -45,6 +48,8 @@ export const HookNameSchema = z.enum([
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
   "anthropic-effort",
+  "hashline-read-enhancer",
+  "hashline-edit-diff-enhancer",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

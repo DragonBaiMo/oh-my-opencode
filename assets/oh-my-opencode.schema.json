@@ -87,9 +87,12 @@
           "claude-code-hooks",
           "auto-slash-command",
           "edit-error-recovery",
+          "json-error-recovery",
           "delegate-task-retry",
           "prometheus-md-only",
           "sisyphus-junior-notepad",
+          "no-sisyphus-gpt",
+          "no-hephaestus-non-gpt",
           "start-work",
           "atlas",
           "unstable-agent-babysitter",
@@ -98,7 +101,9 @@
           "stop-continuation-guard",
           "tasks-todowrite-disabler",
           "write-existing-file-guard",
-          "anthropic-effort"
+          "anthropic-effort",
+          "hashline-read-enhancer",
+          "hashline-edit-diff-enhancer"
         ]
       }
     },
@@ -122,6 +127,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "hashline_edit": {
+      "type": "boolean"
     },
     "agents": {
       "type": "object",
@@ -304,6 +312,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -486,6 +506,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -668,6 +700,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -850,6 +894,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1032,6 +1088,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1214,6 +1282,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1396,6 +1476,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1578,6 +1670,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1760,6 +1864,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1942,6 +2058,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2124,6 +2252,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2306,6 +2446,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2488,6 +2640,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2670,6 +2834,18 @@
                 "type": "string"
               },
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2968,6 +3144,9 @@
         },
         "safe_hook_creation": {
           "type": "boolean"
+        },
+        "disable_omo_env": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -3203,13 +3382,27 @@
           "enum": [
             "playwright",
             "agent-browser",
-            "dev-browser"
+            "dev-browser",
+            "playwright-cli"
           ]
         }
       },
       "required": [
         "provider"
       ],
+      "additionalProperties": false
+    },
+    "websearch": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "exa",
+            "tavily"
+          ]
+        }
+      },
       "additionalProperties": false
     },
     "tmux": {
