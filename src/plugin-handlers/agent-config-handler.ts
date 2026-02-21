@@ -72,8 +72,6 @@ export async function applyAgentConfig(params: {
     ...discoveredUserSkills,
   ];
 
-  const browserProvider =
-    params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
@@ -88,7 +86,6 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.git_master,
     allDiscoveredSkills,
     params.ctx.client,
-    browserProvider,
     currentModel,
     disabledSkills,
     useTaskSystem,

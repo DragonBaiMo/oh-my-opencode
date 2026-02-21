@@ -1,6 +1,5 @@
 import type { AvailableCategory, AvailableSkill } from "./agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "./config"
-import type { BrowserAutomationProvider } from "./config/schema/browser-automation"
 import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { PluginContext, ToolsRecord } from "./plugin/types"
 import type { Managers } from "./create-managers"
@@ -14,7 +13,6 @@ export type CreateToolsResult = {
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
   availableCategories: AvailableCategory[]
-  browserProvider: BrowserAutomationProvider
   disabledSkills: Set<string>
   taskSystemEnabled: boolean
 }
@@ -46,7 +44,6 @@ export async function createTools(args: {
     mergedSkills: skillContext.mergedSkills,
     availableSkills: skillContext.availableSkills,
     availableCategories,
-    browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
     taskSystemEnabled,
   }

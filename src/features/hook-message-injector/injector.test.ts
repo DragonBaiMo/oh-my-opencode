@@ -1,23 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
+import { describe, it, expect } from "bun:test"
 import {
-  findNearestMessageWithFields,
-  findFirstMessageWithAgent,
   findNearestMessageWithFieldsFromSDK,
   findFirstMessageWithAgentFromSDK,
-  injectHookMessage,
 } from "./injector"
-import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-storage-detection"
-
-//#region Mocks
-
-const mockIsSqliteBackend = vi.fn()
-
-vi.mock("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: mockIsSqliteBackend,
-  resetSqliteBackendCache: () => {},
-}))
-
-//#endregion
 
 //#region Test Helpers
 
@@ -189,49 +174,5 @@ describe("findFirstMessageWithAgentFromSDK", () => {
     const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
-  })
-})
-
-describe("injectHookMessage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it("returns false and logs warning on beta/SQLite backend", () => {
-    mockIsSqliteBackend.mockReturnValue(true)
-
-    const result = injectHookMessage("ses_123", "test content", {
-      agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4" },
-    })
-
-    expect(result).toBe(false)
-    expect(mockIsSqliteBackend).toHaveBeenCalled()
-  })
-
-  it("returns false for empty hook content", () => {
-    mockIsSqliteBackend.mockReturnValue(false)
-
-    const result = injectHookMessage("ses_123", "", {
-      agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4" },
-    })
-
-    expect(result).toBe(false)
-  })
-
-  it("returns false for whitespace-only hook content", () => {
-    mockIsSqliteBackend.mockReturnValue(false)
-
-    const result = injectHookMessage("ses_123", "   \n\t  ", {
-      agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4" },
-    })
-
-    expect(result).toBe(false)
   })
 })

@@ -1,8 +1,5 @@
-export { playwrightSkill, agentBrowserSkill } from "./playwright"
-export { playwrightCliSkill } from "./playwright-cli"
 export { frontendUiUxSkill } from "./frontend-ui-ux"
 export { gitMasterSkill } from "./git-master"
-export { devBrowserSkill } from "./dev-browser"
 export { deepResearchSkill } from "./deep-research"
 export { browserTesterDevtoolsSkill } from "./browser-tester-devtools"
 export { requirementsEngineeringSkill } from "./requirements-engineering"

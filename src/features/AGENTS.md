@@ -14,7 +14,7 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 | **tmux-subagent** | 27 | HIGH | Tmux pane management, grid planning, session orchestration |
 | **opencode-skill-loader** | 25 | HIGH | YAML frontmatter skill loading from 4 scopes |
 | **mcp-oauth** | 10 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
-| **builtin-skills** | 10 | LOW | 6 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux |
+| **builtin-skills** | 10 | LOW | 3 skills: git-master, agent-browser, frontend-ui-ux |
 | **skill-mcp-manager** | 10 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
 | **claude-code-plugin-loader** | 10 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
 | **builtin-commands** | 9 | LOW | Command templates: refactor, init-deep, handoff, etc. |
@@ -61,10 +61,7 @@ State-first tmux integration:
 | Skill | Size | MCP | Tools |
 |-------|------|-----|-------|
 | git-master | 1111 LOC | — | Bash |
-| playwright | 312 LOC | @playwright/mcp | — |
-| agent-browser | (in playwright.ts) | — | Bash(agent-browser:*) |
-| playwright-cli | 268 LOC | — | Bash(playwright-cli:*) |
-| dev-browser | 221 LOC | — | Bash |
+| agent-browser | 312 LOC | — | Bash(agent-browser:*) |
 | frontend-ui-ux | 79 LOC | — | — |
 
-Browser variant selected by `browserProvider` config: playwright (default) | playwright-cli | agent-browser.
+Browser automation is powered by `agent-browser`.

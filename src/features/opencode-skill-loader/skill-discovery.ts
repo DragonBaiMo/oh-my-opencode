@@ -3,22 +3,20 @@ import { discoverSkills } from "./loader"
 import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
 
-const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
-const LEGACY_BROWSER_PROVIDER = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
+const cachedSkillsByPathMode = new Map<string, LoadedSkill[]>()
 
 export function clearSkillCache(): void {
-	cachedSkillsByProvider.clear()
+	cachedSkillsByPathMode.clear()
 }
 
 export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const browserProvider = options?.browserProvider ?? LEGACY_BROWSER_PROVIDER
 	const includeClaudeCodePaths = options?.includeClaudeCodePaths ?? true
-	const cacheKey = `${browserProvider}:${includeClaudeCodePaths}`
+	const cacheKey = `${includeClaudeCodePaths}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
 	// Skip cache if disabledSkills is provided (varies between calls)
 	if (!hasDisabledSkills) {
-		const cached = cachedSkillsByProvider.get(cacheKey)
+		const cached = cachedSkillsByPathMode.get(cacheKey)
 		if (cached) return cached
 	}
 
@@ -26,7 +24,6 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 		discoverSkills({ includeClaudeCodePaths, directory: options?.directory }),
 		Promise.resolve(
 			createBuiltinSkills({
-				browserProvider: options?.browserProvider,
 				disabledSkills: options?.disabledSkills,
 			})
 		),
@@ -50,28 +47,16 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 		mcpConfig: skill.mcpConfig,
 	}))
 
-	// Provider-gated skill names that should be filtered based on browserProvider
-	const providerGatedSkillNames = new Set(["agent-browser", LEGACY_BROWSER_PROVIDER])
-
-	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
-	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {
-		if (!providerGatedSkillNames.has(skill.name)) {
-			return true
-		}
-		// For provider-gated skills, only include if it matches the selected provider
-		return skill.name === browserProvider
-	})
-
-	const discoveredNames = new Set(filteredDiscoveredSkills.map((skill) => skill.name))
+	const discoveredNames = new Set(discoveredSkills.map((skill) => skill.name))
 	const uniqueBuiltins = builtinSkillsAsLoaded.filter((skill) => !discoveredNames.has(skill.name))
 
-	let allSkills = [...filteredDiscoveredSkills, ...uniqueBuiltins]
+	let allSkills = [...discoveredSkills, ...uniqueBuiltins]
 
 	// Filter discovered skills by disabledSkills (builtin skills are already filtered by createBuiltinSkills)
 	if (hasDisabledSkills) {
 		allSkills = allSkills.filter((skill) => !options!.disabledSkills!.has(skill.name))
 	} else {
-		cachedSkillsByProvider.set(cacheKey, allSkills)
+		cachedSkillsByPathMode.set(cacheKey, allSkills)
 	}
 
 	return allSkills

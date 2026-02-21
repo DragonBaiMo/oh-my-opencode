@@ -1,4 +1,4 @@
-import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { GitMasterConfig } from "../../config/schema"
 import {
   extractSkillTemplate,
   getAllSkills,
@@ -23,7 +23,6 @@ export async function resolveSkillContent(
   skills: string[],
   options: {
     gitMasterConfig?: GitMasterConfig
-    browserProvider?: BrowserAutomationProvider
     disabledSkills?: Set<string>
     includeClaudeCodePaths?: boolean
     directory?: string
@@ -38,7 +37,6 @@ export async function resolveSkillContent(
   const targetAgent = normalizeAgentName(options.targetAgent)
   const allSkills = await getAllSkills({
     gitMasterConfig: options.gitMasterConfig,
-    browserProvider: options.browserProvider,
     disabledSkills: options.disabledSkills,
     includeClaudeCodePaths,
     directory: options.directory,

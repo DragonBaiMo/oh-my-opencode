@@ -15,9 +15,6 @@ export const BuiltinAgentNameSchema = z.enum([
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
-  "playwright",
-  "agent-browser",
-  "dev-browser",
   "frontend-ui-ux",
   "git-master",
   "deep-research",

@@ -10,7 +10,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
 ])
-const LEGACY_BROWSER_SKILL = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
+const REMOVED_BROWSER_SKILL = "legacy-browser-skill"
 
 function createTool() {
   const manager = {
@@ -81,7 +81,7 @@ describe("delegate-task browser-tester skill injection", () => {
       prompt: "Run browser checks",
       subagent_type: "browser-tester",
       run_in_background: true,
-      load_skills: [LEGACY_BROWSER_SKILL],
+      load_skills: [REMOVED_BROWSER_SKILL],
     }
 
     //#when
@@ -197,7 +197,7 @@ describe("delegate-task browser-tester skill injection", () => {
       prompt: "Run browser checks",
       subagent_type: "browser-tester",
       run_in_background: true,
-      load_skills: [LEGACY_BROWSER_SKILL, "agent-browser", "dev-browser", "git-master"],
+      load_skills: [REMOVED_BROWSER_SKILL, "legacy-browser-provider", "git-master"],
     }
 
     //#when

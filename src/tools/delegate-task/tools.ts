@@ -3,7 +3,6 @@ import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions
 import { CATEGORY_DESCRIPTIONS } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
-import { BROWSER_AUTOMATION_PROVIDERS } from "../../shared/browser-automation-provider"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -24,8 +23,6 @@ import {
 
 const BROWSER_TESTER_AGENT = "browser-tester"
 const BROWSER_TESTER_DEVTOOLS_SKILL = "browser-tester-devtools"
-
-const BROWSER_SKILLS: string[] = [...BROWSER_AUTOMATION_PROVIDERS]
 
 function normalizeAgentName(agent?: string): string {
   return agent?.trim().toLowerCase() ?? ""
@@ -134,12 +131,12 @@ Prompts MUST be in English.`
 
       const targetAgent = normalizeAgentName(args.subagent_type)
       if (targetAgent === BROWSER_TESTER_AGENT) {
-        args.load_skills = args.load_skills.filter(s => !BROWSER_SKILLS.includes(s))
+        args.load_skills = args.load_skills.filter((skillName) => !skillName.toLowerCase().includes("browser"))
         if (!args.load_skills.includes(BROWSER_TESTER_DEVTOOLS_SKILL)) {
           args.load_skills = [...args.load_skills, BROWSER_TESTER_DEVTOOLS_SKILL]
         }
       } else {
-        const forbiddenSkills = [...BROWSER_SKILLS, BROWSER_TESTER_DEVTOOLS_SKILL]
+        const forbiddenSkills = [BROWSER_TESTER_DEVTOOLS_SKILL]
         args.load_skills = args.load_skills.filter(s => !forbiddenSkills.includes(s))
       }
 
@@ -147,7 +144,6 @@ Prompts MUST be in English.`
 
       const { content: skillContent, error: skillError } = await resolveSkillContent(args.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
-        browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
         directory: options.directory,
         targetAgent,

@@ -1,7 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
 
-const LEGACY_BROWSER_PROVIDER = String.fromCharCode(112, 108, 97, 121, 119, 114, 105, 103, 104, 116)
 
 describe("createBuiltinSkills", () => {
 	test("returns built-in baseline", () => {
@@ -12,12 +11,10 @@ describe("createBuiltinSkills", () => {
 		const names = skills.map((s) => s.name)
 
 		// then
-		expect(skills).toHaveLength(10)
+		expect(skills).toHaveLength(8)
 		expect(names).toEqual([
-			"playwright",
 			"frontend-ui-ux",
 			"git-master",
-			"dev-browser",
 			"deep-research",
 			"browser-tester-devtools",
 			"requirements-engineering",
@@ -25,27 +22,6 @@ describe("createBuiltinSkills", () => {
 			"acceptance-criteria",
 			"decision-record",
 		])
-		expect(names).toContain("playwright")
-		expect(names).not.toContain("agent-browser")
-		expect(names).toContain("dev-browser")
-	})
-
-	test("respects browserProvider option for browser skill", () => {
-		// given
-		const legacyProvider = { browserProvider: LEGACY_BROWSER_PROVIDER as any }
-		const agentBrowserProvider = { browserProvider: "agent-browser" as const }
-
-		// when
-		const legacySkills = createBuiltinSkills(legacyProvider as any)
-		const agentBrowserSkills = createBuiltinSkills(agentBrowserProvider)
-
-		// then
-		expect(legacySkills).toHaveLength(10)
-		expect(agentBrowserSkills).toHaveLength(10)
-		expect(legacySkills.map((s) => s.name)).toContain(LEGACY_BROWSER_PROVIDER)
-		expect(legacySkills.map((s) => s.name)).not.toContain("agent-browser")
-		expect(agentBrowserSkills.map((s) => s.name)).toContain("agent-browser")
-		expect(agentBrowserSkills.map((s) => s.name)).not.toContain(LEGACY_BROWSER_PROVIDER)
 	})
 
 	test("browser-tester-devtools skill is agent-restricted with chrome-devtools MCP", () => {
@@ -81,7 +57,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("contract-delivery")
 		expect(skills.map((s) => s.name)).toContain("acceptance-criteria")
 		expect(skills.map((s) => s.name)).toContain("decision-record")
-		expect(skills.length).toBe(9)
+		expect(skills.length).toBe(7)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -100,15 +76,13 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("contract-delivery")
 		expect(skills.map((s) => s.name)).toContain("acceptance-criteria")
 		expect(skills.map((s) => s.name)).toContain("decision-record")
-		expect(skills.length).toBe(8)
+		expect(skills.length).toBe(6)
 	})
 
-	test("should return an empty array when all skills are disabled", () => {
+		test("should return an empty array when all skills are disabled", () => {
 		// #given
 		const options = {
 				disabledSkills: new Set([
-				LEGACY_BROWSER_PROVIDER,
-				"dev-browser",
 				"frontend-ui-ux",
 				"git-master",
 				"deep-research",
@@ -135,7 +109,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(10)
+		expect(skills.length).toBe(8)
 	})
 
 	test("includes Athena analysis skills in baseline", () => {
@@ -152,34 +126,4 @@ describe("createBuiltinSkills", () => {
 		expect(names).toContain("decision-record")
 	})
 
-	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
-		// given
-		const options = { browserProvider: "playwright-cli" as const }
-
-		// when
-		const skills = createBuiltinSkills(options)
-
-		// then
-		const playwrightSkill = skills.find((s) => s.name === "playwright")
-		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
-		expect(playwrightSkill).toBeDefined()
-		expect(playwrightSkill!.description).toContain("browser")
-		expect(playwrightSkill!.allowedTools).toContain("Bash(playwright-cli:*)")
-		expect(playwrightSkill!.mcpConfig).toBeUndefined()
-		expect(agentBrowserSkill).toBeUndefined()
-	})
-
-	test("playwright-cli skill template contains CLI commands", () => {
-		// given
-		const options = { browserProvider: "playwright-cli" as const }
-
-		// when
-		const skills = createBuiltinSkills(options)
-		const skill = skills.find((s) => s.name === "playwright")
-
-		// then
-		expect(skill!.template).toContain("playwright-cli open")
-		expect(skill!.template).toContain("playwright-cli snapshot")
-		expect(skill!.template).toContain("playwright-cli click")
-	})
 })

@@ -1,15 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import {
   AgentOverrideConfigSchema,
-  BrowserAutomationConfigSchema,
-  BrowserAutomationProviderSchema,
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
   ExperimentalConfigSchema,
   GitMasterConfigSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
-
 describe("disabled_mcps schema", () => {
   test("should accept built-in MCP names", () => {
     // given
@@ -30,7 +27,7 @@ describe("disabled_mcps schema", () => {
   test("should accept custom MCP names", () => {
     // given
     const config = {
-      disabled_mcps: ["playwright", "sqlite", "custom-mcp"],
+      disabled_mcps: ["sqlite", "custom-mcp"],
     }
 
     // when
@@ -39,14 +36,14 @@ describe("disabled_mcps schema", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disabled_mcps).toEqual(["playwright", "sqlite", "custom-mcp"])
+      expect(result.data.disabled_mcps).toEqual(["sqlite", "custom-mcp"])
     }
   })
 
   test("should accept mixed built-in and custom names", () => {
     // given
     const config = {
-      disabled_mcps: ["context7", "playwright", "custom-server"],
+      disabled_mcps: ["context7", "custom-server"],
     }
 
     // when
@@ -55,7 +52,7 @@ describe("disabled_mcps schema", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disabled_mcps).toEqual(["context7", "playwright", "custom-server"])
+      expect(result.data.disabled_mcps).toEqual(["context7", "custom-server"])
     }
   })
 
@@ -515,132 +512,6 @@ describe("Sisyphus-Junior agent override", () => {
       expect(result.data.agents?.metis?.category).toBe("ultrabrain")
       expect(result.data.agents?.momus?.category).toBe("quick")
     }
-  })
-})
-
-describe("BrowserAutomationProviderSchema", () => {
-  test("accepts 'playwright' as valid provider", () => {
-    // given
-    const input = "playwright"
-
-    // when
-    const result = BrowserAutomationProviderSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data).toBe("playwright")
-  })
-
-  test("accepts 'agent-browser' as valid provider", () => {
-    // given
-    const input = "agent-browser"
-
-    // when
-    const result = BrowserAutomationProviderSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data).toBe("agent-browser")
-  })
-
-  test("rejects invalid provider", () => {
-    // given
-    const input = "invalid-provider"
-
-    // when
-    const result = BrowserAutomationProviderSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(false)
-  })
-
-  test("accepts 'playwright-cli' as valid provider", () => {
-    // given
-    const input = "playwright-cli"
-
-    // when
-    const result = BrowserAutomationProviderSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data).toBe("playwright-cli")
-  })
-})
-
-describe("BrowserAutomationConfigSchema", () => {
-  test("defaults provider to 'playwright' when not specified", () => {
-    // given
-    const input = {}
-
-    // when
-    const result = BrowserAutomationConfigSchema.parse(input)
-
-    // then
-    expect(result.provider).toBe("playwright")
-  })
-
-  test("accepts agent-browser provider", () => {
-    // given
-    const input = { provider: "agent-browser" }
-
-    // when
-    const result = BrowserAutomationConfigSchema.parse(input)
-
-    // then
-    expect(result.provider).toBe("agent-browser")
-  })
-
-  test("accepts playwright-cli provider in config", () => {
-    // given
-    const input = { provider: "playwright-cli" }
-
-    // when
-    const result = BrowserAutomationConfigSchema.parse(input)
-
-    // then
-    expect(result.provider).toBe("playwright-cli")
-  })
-})
-
-describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
-  test("accepts browser_automation_engine config", () => {
-    // given
-    const input = {
-      browser_automation_engine: {
-        provider: "agent-browser",
-      },
-    }
-
-    // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data?.browser_automation_engine?.provider).toBe("agent-browser")
-  })
-
-  test("accepts config without browser_automation_engine", () => {
-    // given
-    const input = {}
-
-    // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data?.browser_automation_engine).toBeUndefined()
-  })
-
-  test("accepts browser_automation_engine with playwright-cli", () => {
-    // given
-    const input = { browser_automation_engine: { provider: "playwright-cli" } }
-
-    // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
-
-    // then
-    expect(result.success).toBe(true)
-    expect(result.data?.browser_automation_engine?.provider).toBe("playwright-cli")
   })
 })
 

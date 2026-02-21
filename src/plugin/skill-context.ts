@@ -1,6 +1,5 @@
 import type { AvailableSkill } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
-import type { BrowserAutomationProvider } from "../config/schema/browser-automation"
 import type {
   LoadedSkill,
   SkillScope,
@@ -22,7 +21,6 @@ import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 export type SkillContext = {
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
-  browserProvider: BrowserAutomationProvider
   disabledSkills: Set<string>
 }
 
@@ -38,14 +36,10 @@ export async function createSkillContext(args: {
 }): Promise<SkillContext> {
   const { directory, pluginConfig } = args
 
-  const browserProvider: BrowserAutomationProvider =
-    pluginConfig.browser_automation_engine?.provider ?? "playwright"
-
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? [])
   const systemMcpNames = getSystemMcpServerNames()
 
   const builtinSkills = createBuiltinSkills({
-    browserProvider,
     disabledSkills,
   }).filter((skill) => {
     if (skill.mcpConfig) {
@@ -91,7 +85,6 @@ export async function createSkillContext(args: {
   return {
     mergedSkills,
     availableSkills,
-    browserProvider,
     disabledSkills,
   }
 }

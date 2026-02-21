@@ -45,9 +45,6 @@
       "items": {
         "type": "string",
         "enum": [
-          "playwright",
-          "agent-browser",
-          "dev-browser",
           "frontend-ui-ux",
           "git-master",
           "deep-research",
@@ -3776,25 +3773,6 @@
       "required": [
         "commit_footer",
         "include_co_authored_by"
-      ],
-      "additionalProperties": false
-    },
-    "browser_automation_engine": {
-      "type": "object",
-      "properties": {
-        "provider": {
-          "default": "playwright",
-          "type": "string",
-          "enum": [
-            "playwright",
-            "agent-browser",
-            "dev-browser",
-            "playwright-cli"
-          ]
-        }
-      },
-      "required": [
-        "provider"
       ],
       "additionalProperties": false
     },
