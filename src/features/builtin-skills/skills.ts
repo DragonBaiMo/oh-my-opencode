@@ -10,6 +10,10 @@ import {
   devBrowserSkill,
   deepResearchSkill,
   browserTesterDevtoolsSkill,
+  requirementsEngineeringSkill,
+  contractDeliverySkill,
+  acceptanceCriteriaSkill,
+  decisionRecordSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
@@ -36,6 +40,10 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     devBrowserSkill,
     deepResearchSkill,
     browserTesterDevtoolsSkill,
+    requirementsEngineeringSkill,
+    contractDeliverySkill,
+    acceptanceCriteriaSkill,
+    decisionRecordSkill,
   ]
 
   if (!disabledSkills) {

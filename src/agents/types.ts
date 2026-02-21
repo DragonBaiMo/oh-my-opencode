@@ -89,6 +89,7 @@ export type BuiltinAgentName =
   | "multimodal-looker"
   | "metis"
   | "momus"
+  | "athena"
   | "atlas"
 
 export type OverridableAgentName =

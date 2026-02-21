@@ -79,4 +79,35 @@ describe("resolveSubagentExecution", () => {
       error: "network timeout",
     })
   })
+
+  test("resolves Athena display name to athena config key and delegates", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "Athena" })
+    const executorCtx = createExecutorContext(async () => [
+      { name: "athena", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-6" } },
+    ])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("athena")
+    expect(result.categoryModel).toBeDefined()
+  })
+
+  test("normalizes @agent syntax to plain subagent_type", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "@athena" })
+    const executorCtx = createExecutorContext(async () => [
+      { name: "athena", mode: "subagent", model: { providerID: "anthropic", modelID: "claude-opus-4-6" } },
+    ])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("athena")
+  })
 })

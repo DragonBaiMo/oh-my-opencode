@@ -69,4 +69,23 @@ discovered body`
     expect(result.error).toContain("test-discovered")
     expect(result.error).toContain("browser-tester-devtools")
   })
+
+  test("resolves Athena builtin skills by name", async () => {
+    //#when
+    const result = await resolveSkillContent([
+      "requirements-engineering",
+      "contract-delivery",
+      "acceptance-criteria",
+      "decision-record",
+    ], {
+      targetAgent: "athena",
+    })
+
+    //#then
+    expect(result.error).toBeNull()
+    expect(result.content).toContain("Requirements Engineering")
+    expect(result.content).toContain("Contract Delivery")
+    expect(result.content).toContain("Acceptance Criteria")
+    expect(result.content).toContain("Decision Record")
+  })
 })

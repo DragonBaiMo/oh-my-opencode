@@ -252,6 +252,18 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.prompt).toContain("git-master")
   })
 
+  test("createBuiltinAgents includes athena as callable subagent", async () => {
+    // #given
+
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined)
+
+    // #then
+    expect(agents.athena).toBeDefined()
+    expect(agents.athena.mode).toBe("subagent")
+    expect(agents.athena.prompt).toContain("Athena")
+  })
+
   test("includes custom agents in orchestrator prompts when provided via config", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(

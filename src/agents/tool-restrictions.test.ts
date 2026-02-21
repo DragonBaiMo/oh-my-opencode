@@ -4,6 +4,7 @@ import { createLibrarianAgent } from "./librarian"
 import { createExploreAgent } from "./explore"
 import { createMomusAgent } from "./momus"
 import { createMetisAgent } from "./metis"
+import { createAthenaAgent } from "./athena"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -93,6 +94,23 @@ describe("read-only agent tool restrictions", () => {
       // then
       for (const tool of FILE_WRITE_TOOLS) {
         expect(permission[tool]).toBe("deny")
+      }
+    })
+  })
+
+  describe("Athena", () => {
+    test("denies task and call_omo_agent but allows file-writing tools", () => {
+      // given
+      const agent = createAthenaAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+
+      // then
+      expect(permission["task"]).toBe("deny")
+      expect(permission["call_omo_agent"]).toBe("deny")
+      for (const tool of FILE_WRITE_TOOLS) {
+        expect(permission[tool]).toBeUndefined()
       }
     })
   })
