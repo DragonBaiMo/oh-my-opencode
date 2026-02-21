@@ -66,7 +66,7 @@ describe("createChatHeadersHandler", () => {
         sessionID: "ses_1",
         provider: { id: "openai" },
         message: {
-          id: "msg_1",
+          id: "msg_2",
           role: "user",
         },
       },
@@ -94,10 +94,10 @@ describe("createChatHeadersHandler", () => {
 
     await handler(
       {
-        sessionID: "ses_1",
+        sessionID: "ses_3",
         provider: { id: "github-copilot" },
         message: {
-          id: "msg_1",
+          id: "msg_3",
           role: "user",
         },
       },

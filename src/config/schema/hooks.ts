@@ -6,13 +6,13 @@ export const HookNameSchema = z.enum([
   "session-recovery",
   "session-notification",
   "comment-checker",
-  "grep-output-truncator",
   "tool-output-truncator",
   "question-label-truncator",
   "directory-agents-injector",
   "directory-readme-injector",
   "empty-task-response-detector",
   "think-mode",
+  "model-fallback",
   "anthropic-context-window-limit-recovery",
   "preemptive-compaction",
   "rules-injector",
@@ -25,6 +25,7 @@ export const HookNameSchema = z.enum([
   "interactive-bash-session",
 
   "thinking-block-validator",
+  "beast-mode-system",
   "ralph-loop",
   "category-skill-reminder",
 
@@ -42,14 +43,13 @@ export const HookNameSchema = z.enum([
   "start-work",
   "atlas",
   "unstable-agent-babysitter",
-  "task-reminder",
   "task-resume-info",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
+  "runtime-fallback",
   "write-existing-file-guard",
   "anthropic-effort",
   "hashline-read-enhancer",
-  "hashline-edit-diff-enhancer",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

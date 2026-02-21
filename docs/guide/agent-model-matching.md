@@ -2,9 +2,58 @@
 
 > **For agents and users**: How to pick the right model for each agent. Read this before customizing model settings.
 
-Run `opencode models` to see all available models on your system, and `opencode auth login` to authenticate with providers.
+## Example Configuration
 
----
+Here's a practical example configuration showing agent-model assignments:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+
+  "agents": {
+    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    "sisyphus": {
+      "model": "kimi-for-coding/k2p5",
+      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" }
+    },
+
+    // Research agents: cheaper models are fine
+    "librarian": { "model": "zai-coding-plan/glm-4.7" },
+    "explore":   { "model": "github-copilot/grok-code-fast-1" },
+
+    // Architecture consultation: GPT or Claude Opus
+    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
+
+    // Prometheus inherits sisyphus model; just add prompt guidance
+    "prometheus": { "prompt_append": "Leverage deep & quick agents heavily, always in parallel." }
+  },
+
+  "categories": {
+    // quick — trivial tasks
+    "quick": { "model": "opencode/gpt-5-nano" },
+
+    // unspecified-low — moderate tasks
+    "unspecified-low": { "model": "kimi-for-coding/k2p5" },
+
+    // unspecified-high — complex work
+    "unspecified-high": { "model": "anthropic/claude-sonnet-4-6", "variant": "max" },
+
+    // visual-engineering — Gemini dominates visual tasks
+    "visual-engineering": { "model": "google/gemini-3-pro", "variant": "high" },
+
+    // writing — docs/prose
+    "writing": { "model": "kimi-for-coding/k2p5" }
+  },
+
+  // Limit expensive providers; let cheap ones run freely
+  "background_task": {
+    "providerConcurrency": { "anthropic": 3, "openai": 3, "opencode": 10, "zai-coding-plan": 10 },
+    "modelConcurrency": { "anthropic/claude-opus-4-6": 2, "opencode/gpt-5-nano": 20 }
+  }
+}
+```
+
+Run `opencode models` to see all available models on your system, and `opencode auth login` to authenticate with providers.
 
 ## Model Families: Know Your Options
 
@@ -102,7 +151,7 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 
 ## Task Categories
 
-Categories control which model is used for `background_task` and `delegate_task`. See the [Orchestration System Guide](./understanding-orchestration-system.md) for how agents dispatch tasks to categories.
+Categories control which model is used for `background_task` and `delegate_task`. See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
 
 | Category | When Used | Recommended Models | Notes |
 |----------|-----------|-------------------|-------|
@@ -137,7 +186,7 @@ This is why Prometheus and Atlas ship separate prompts per model family — they
 
 ### How to Customize
 
-Override in `oh-my-opencode.json`:
+Override in `oh-my-opencode.jsonc`:
 
 ```jsonc
 {
@@ -188,6 +237,6 @@ Native (anthropic/, openai/, google/) > Kimi for Coding > GitHub Copilot > Venic
 ## See Also
 
 - [Installation Guide](./installation.md) — Setup and authentication
-- [Orchestration System](./understanding-orchestration-system.md) — How agents dispatch tasks to categories
-- [Configuration Reference](../configurations.md) — Full config options
+- [Orchestration System Guide](./orchestration.md) — How agents dispatch tasks to categories
+- [Configuration Reference](../reference/configuration.md) — Full config options
 - [`src/shared/model-requirements.ts`](../../src/shared/model-requirements.ts) — Source of truth for fallback chains
