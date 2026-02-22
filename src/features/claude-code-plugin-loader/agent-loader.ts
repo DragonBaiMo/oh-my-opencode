@@ -45,10 +45,11 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, AgentC
 
         const originalDescription = data.description || ""
         const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
+        const mode = data.mode === "primary" || data.mode === "all" ? data.mode : "subagent"
 
         const config: AgentConfig = {
           description: formattedDescription,
-          mode: "subagent",
+          mode,
           prompt: body.trim(),
         }
 

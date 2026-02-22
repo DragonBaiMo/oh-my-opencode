@@ -6,6 +6,7 @@ import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
+import { createBrowserTesterAgent, BROWSER_TESTER_PROMPT_METADATA } from "./browser-tester"
 import { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
@@ -35,6 +36,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
+  "browser-tester": createBrowserTesterAgent,
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
@@ -52,6 +54,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
+  "browser-tester": BROWSER_TESTER_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,

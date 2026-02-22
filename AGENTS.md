@@ -126,6 +126,66 @@ bunx oh-my-opencode run     # Non-interactive session
 | publish-platform.yml | called | 11 platform binaries via bun compile (darwin/linux/windows) |
 | sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
 
+## LOCAL FORK MERGE GUARDRAILS (MANDATORY)
+
+This repository is a **local fork**. After upstream merges, local constraints in this section override generated summaries above.
+
+### MUST
+
+- **Librarian-only external research**: External docs / remote code / information gathering must be handled by **`Librarian`** only.
+- **Mandatory delegation**: Non-Librarian agents (including `Sisyphus`, `Hephaestus`, `Prometheus`) must delegate external research via `subagent_type="librarian"` instead of calling research/info tools directly.
+- **Browser validation stack**: Keep browser validation/debugging limited to **`browser-tester` + `browser-tester-devtools`** only.
+- **Post-merge audit**: Run the post-merge checklist below after every upstream sync/merge.
+- **Keep normal tests**: Preserve unrelated tests. Only remove/update tests when the underlying local feature/policy was intentionally removed.
+
+### MUST NOT
+
+- Do **not** reintroduce browser automation components removed in this fork:
+  - `playwright`
+  - `playwright-cli`
+  - `agent-browser`
+  - `dev-browser`
+  - `browser_automation_engine`
+- Do **not** reintroduce built-in remote MCP entries removed in this fork:
+  - `context7`
+  - `grep_app`
+  - `websearch`
+- Do **not** grant non-Librarian agents direct access to external information/research tool classes (including `webfetch`-style direct external fetch usage).
+
+### POST-MERGE CHECKLIST (REQUIRED)
+
+1. **Forbidden keyword scan**
+
+   ```bash
+   bunx --yes rg -n "playwright|playwright-cli|agent-browser|dev-browser|browser_automation_engine|context7|grep_app|websearch" src assets
+   ```
+
+   Expected: only allowlist/guardrail/test references (no active implementation reintroduction).
+
+2. **Tool permission audit**
+
+   - Check `src/plugin-handlers/tool-config-handler.ts`
+   - Confirm research/info tool access remains denied by default and only explicitly allowed for `librarian` (if present at all)
+   - Confirm non-Librarian agents are not granted direct research/info tools
+
+3. **Browser path audit**
+
+   - Confirm browser testing/debugging path remains `browser-tester` + `browser-tester-devtools`
+   - Confirm no `playwright` / `agent-browser` / `dev-browser` skill or config chain was restored
+
+4. **Targeted regression tests**
+
+   ```bash
+   bun test src/tools/delegate-task/browser-tester-skill-injection.test.ts src/features/builtin-skills/skills.test.ts src/mcp/index.test.ts src/config/schema.test.ts
+   ```
+
+5. **Typecheck + build**
+
+   ```bash
+   bun run typecheck
+   bun run build
+   ```
+
 ## NOTES
 
 - Logger writes to `/tmp/oh-my-opencode.log` — check there for debugging

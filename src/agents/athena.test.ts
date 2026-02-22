@@ -4,12 +4,12 @@ import { createAthenaAgent, ATHENA_PROMPT_METADATA } from "./athena"
 const TEST_MODEL = "anthropic/claude-opus-4-6"
 
 describe("createAthenaAgent", () => {
-  test("returns subagent config with expected defaults", () => {
+  test("returns all-mode config with expected defaults", () => {
     // given
     const agent = createAthenaAgent(TEST_MODEL)
 
     // then
-    expect(agent.mode).toBe("subagent")
+    expect(agent.mode).toBe("all")
     expect(agent.temperature).toBe(0.2)
     expect(agent.model).toBe(TEST_MODEL)
     expect(agent.prompt).toContain("<decision_framework>")

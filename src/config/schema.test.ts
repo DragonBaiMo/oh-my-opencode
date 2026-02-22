@@ -43,7 +43,7 @@ describe("disabled_mcps schema", () => {
   test("should accept mixed built-in and custom names", () => {
     // given
     const config = {
-      disabled_mcps: ["context7", "custom-server"],
+      disabled_mcps: ["research-mcp", "custom-server"],
     }
 
     // when
@@ -52,7 +52,7 @@ describe("disabled_mcps schema", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disabled_mcps).toEqual(["context7", "custom-server"])
+      expect(result.data.disabled_mcps).toEqual(["research-mcp", "custom-server"])
     }
   })
 

@@ -20,6 +20,8 @@ export function applyToolConfig(params: {
 
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
+    websearch: false,
+    "context7_*": false,
     "grep_app_*": false,
     LspHover: false,
     LspCodeActions: false,
@@ -36,7 +38,12 @@ export function applyToolConfig(params: {
 
   const librarian = agentByKey(params.agentResult, "librarian");
   if (librarian) {
-    librarian.permission = { ...librarian.permission, "grep_app_*": "allow" };
+    librarian.permission = {
+      ...librarian.permission,
+      websearch: "allow",
+      "context7_*": "allow",
+      "grep_app_*": "allow",
+    };
   }
   const looker = agentByKey(params.agentResult, "multimodal-looker");
   if (looker) {
@@ -98,7 +105,7 @@ export function applyToolConfig(params: {
 
   params.config.permission = {
     ...(params.config.permission as Record<string, unknown>),
-    webfetch: "allow",
+    webfetch: "deny",
     external_directory: "allow",
     task: "deny",
   };

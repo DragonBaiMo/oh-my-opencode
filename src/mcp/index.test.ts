@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createBuiltinMcps } from "./index"
 
 describe("createBuiltinMcps", () => {
-  test("should return all MCPs when disabled_mcps is empty", () => {
+  test("returns empty object when disabled_mcps is empty", () => {
     // given
     const disabledMcps: string[] = []
 
@@ -10,67 +10,57 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     // then
-    expect(result).toHaveProperty("websearch")
-    expect(result).toHaveProperty("context7")
-    expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(3)
-  })
-
-  test("should filter out disabled built-in MCPs", () => {
-    // given
-    const disabledMcps = ["context7"]
-
-    // when
-    const result = createBuiltinMcps(disabledMcps)
-
-    // then
-    expect(result).toHaveProperty("websearch")
-    expect(result).not.toHaveProperty("context7")
-    expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(2)
-  })
-
-  test("should filter out all built-in MCPs when all disabled", () => {
-    // given
-    const disabledMcps = ["websearch", "context7", "grep_app"]
-
-    // when
-    const result = createBuiltinMcps(disabledMcps)
-
-    // then
-    expect(result).not.toHaveProperty("websearch")
-    expect(result).not.toHaveProperty("context7")
-    expect(result).not.toHaveProperty("grep_app")
+    expect(result).toEqual({})
     expect(Object.keys(result)).toHaveLength(0)
   })
 
-  test("should ignore custom MCP names in disabled_mcps", () => {
+  test("ignores disabled names and still returns empty object", () => {
     // given
-    const disabledMcps = ["context7", "playwright", "custom"]
+    const disabledMcps = ["remote-docs"]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
 
     // then
-    expect(result).toHaveProperty("websearch")
-    expect(result).not.toHaveProperty("context7")
-    expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(2)
+    expect(result).toEqual({})
+    expect(Object.keys(result)).toHaveLength(0)
   })
 
-  test("should handle empty disabled_mcps by default", () => {
+  test("returns empty object when many names are disabled", () => {
+    // given
+    const disabledMcps = ["remote-search", "remote-docs", "code-search"]
+
+    // when
+    const result = createBuiltinMcps(disabledMcps)
+
+    // then
+    expect(result).toEqual({})
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  test("ignores mixed disabled names in disabled_mcps", () => {
+    // given
+    const disabledMcps = ["remote-docs", "playwright", "custom"]
+
+    // when
+    const result = createBuiltinMcps(disabledMcps)
+
+    // then
+    expect(result).toEqual({})
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  test("handles default argument", () => {
     // given
     // when
     const result = createBuiltinMcps()
 
     // then
-    expect(result).toHaveProperty("websearch")
-    expect(result).toHaveProperty("context7")
-    expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(3)
+    expect(result).toEqual({})
+    expect(Object.keys(result)).toHaveLength(0)
   })
 
-  test("should only filter built-in MCPs, ignoring unknown names", () => {
+  test("ignores unknown MCP names", () => {
     // given
     const disabledMcps = ["playwright", "sqlite", "unknown-mcp"]
 
@@ -78,29 +68,20 @@ describe("createBuiltinMcps", () => {
     const result = createBuiltinMcps(disabledMcps)
 
     // then
-    expect(result).toHaveProperty("websearch")
-    expect(result).toHaveProperty("context7")
-    expect(result).toHaveProperty("grep_app")
-    expect(Object.keys(result)).toHaveLength(3)
+    expect(result).toEqual({})
+    expect(Object.keys(result)).toHaveLength(0)
   })
 
-  test("should not throw when websearch disabled even if tavily configured without API key", () => {
+  test("does not throw when legacy config shape is provided", () => {
     // given
-    const originalTavilyKey = process.env.TAVILY_API_KEY
-    delete process.env.TAVILY_API_KEY
-    const disabledMcps = ["websearch"]
-    const config = { websearch: { provider: "tavily" as const } }
+    const disabledMcps: string[] = []
+    const config = { legacy_provider: { provider: "tavily" as const } }
 
-    try {
-      // when
-      const createMcps = () => createBuiltinMcps(disabledMcps, config)
+    // when
+    const createMcps = () => createBuiltinMcps(disabledMcps, config)
 
-      // then
-      expect(createMcps).not.toThrow()
-      const result = createMcps()
-      expect(result).not.toHaveProperty("websearch")
-    } finally {
-      if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
-    }
+    // then
+    expect(createMcps).not.toThrow()
+    expect(createMcps()).toEqual({})
   })
 })

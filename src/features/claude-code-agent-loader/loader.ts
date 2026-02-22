@@ -3,7 +3,7 @@ import { join, basename } from "path"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir, getOpenCodeConfigDir } from "../../shared"
 import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
@@ -41,12 +41,13 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
        const originalDescription = data.description || ""
 
        const formattedDescription = `(${scope}) ${originalDescription}`
+       const mode = data.mode === "primary" || data.mode === "all" ? data.mode : "subagent"
 
        const config: AgentConfig = {
          description: formattedDescription,
-         mode: "subagent",
-         prompt: body.trim(),
-       }
+          mode,
+          prompt: body.trim(),
+        }
 
        const toolsConfig = parseToolsConfig(data.tools)
       if (toolsConfig) {
@@ -71,8 +72,12 @@ export function loadUserAgents(): Record<string, AgentConfig> {
   const userAgentsDir = join(getClaudeConfigDir(), "agents")
   const agents = loadAgentsFromDir(userAgentsDir, "user")
 
+  const opencodeConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const opencodeAgentsDir = join(opencodeConfigDir, "agents")
+  const opencodeAgents = loadAgentsFromDir(opencodeAgentsDir, "user")
+
   const result: Record<string, AgentConfig> = {}
-  for (const agent of agents) {
+  for (const agent of [...opencodeAgents, ...agents]) {
     result[agent.name] = agent.config
   }
   return result
@@ -82,8 +87,11 @@ export function loadProjectAgents(directory?: string): Record<string, AgentConfi
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
   const agents = loadAgentsFromDir(projectAgentsDir, "project")
 
+  const opencodeProjectAgentsDir = join(directory ?? process.cwd(), ".opencode", "agents")
+  const opencodeProjectAgents = loadAgentsFromDir(opencodeProjectAgentsDir, "project")
+
   const result: Record<string, AgentConfig> = {}
-  for (const agent of agents) {
+  for (const agent of [...opencodeProjectAgents, ...agents]) {
     result[agent.name] = agent.config
   }
   return result

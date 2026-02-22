@@ -32,6 +32,7 @@
           "oracle",
           "librarian",
           "explore",
+          "browser-tester",
           "multimodal-looker",
           "metis",
           "momus",
@@ -3776,19 +3777,6 @@
       ],
       "additionalProperties": false
     },
-    "websearch": {
-      "type": "object",
-      "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "exa",
-            "tavily"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "tmux": {
       "type": "object",
       "properties": {
@@ -3865,5 +3853,5 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": {}
 }

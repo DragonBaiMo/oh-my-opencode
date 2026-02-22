@@ -86,6 +86,7 @@ export type BuiltinAgentName =
   | "oracle"
   | "librarian"
   | "explore"
+  | "browser-tester"
   | "multimodal-looker"
   | "metis"
   | "momus"

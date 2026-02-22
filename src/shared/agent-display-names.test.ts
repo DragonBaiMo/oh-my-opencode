@@ -133,6 +133,28 @@ describe("getAgentDisplayName", () => {
     // then returns "multimodal-looker"
     expect(result).toBe("multimodal-looker")
   })
+
+  it("returns display name for browser-tester", () => {
+    // given config key "browser-tester"
+    const configKey = "browser-tester"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then returns Browser-Tester display name
+    expect(result).toBe("Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)")
+  })
+
+  it("returns display name for athena", () => {
+    // given config key "athena"
+    const configKey = "athena"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then returns Athena display name
+    expect(result).toBe("Athena (业务分析智能体，需求梳理与验收定义)")
+  })
 })
 
 describe("getAgentConfigKey", () => {
@@ -173,6 +195,8 @@ describe("getAgentConfigKey", () => {
     expect(getAgentConfigKey("Metis (Plan Consultant)")).toBe("metis")
     expect(getAgentConfigKey("Momus (Plan Critic)")).toBe("momus")
     expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
+    expect(getAgentConfigKey("Athena (业务分析智能体，需求梳理与验收定义)")).toBe("athena")
+    expect(getAgentConfigKey("Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)")).toBe("browser-tester")
   })
 })
 
@@ -190,6 +214,8 @@ describe("AGENT_DISPLAY_NAMES", () => {
       oracle: "oracle",
       librarian: "librarian",
       explore: "explore",
+      athena: "Athena (业务分析智能体，需求梳理与验收定义)",
+      "browser-tester": "Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)",
       "multimodal-looker": "multimodal-looker",
     }
 

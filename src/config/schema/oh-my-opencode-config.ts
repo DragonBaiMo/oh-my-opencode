@@ -17,7 +17,6 @@ import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
-import { WebsearchConfigSchema } from "./websearch"
 
 
 export const OhMyOpenCodeConfigSchema = z.object({
@@ -49,12 +48,11 @@ export const OhMyOpenCodeConfigSchema = z.object({
   notification: NotificationConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
-  websearch: WebsearchConfigSchema.optional(),
 
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
-})
+}).passthrough()
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>

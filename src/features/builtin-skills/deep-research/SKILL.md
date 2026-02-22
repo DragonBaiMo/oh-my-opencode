@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: "深度调研工具 - 通过外部 AI 平台进行深度技术调研。当需要查询库文档、最新技术信息、最佳实践或解决不确定性问题时使用。替代所有网络搜索工具。"
+description: "深度调研工具 - 通过外部 AI 平台进行深度技术调研。当需要查询库文档、最新技术信息、最佳实践或解决不确定性问题时使用。替代所有网络搜索工具。默认使用 grok-4.20-beta，复杂问题可用 grok-4.1-expert。禁止多轮对话。"
 ---
 
 # 深度调研工具 (Deep Research)
@@ -25,19 +25,19 @@ description: "深度调研工具 - 通过外部 AI 平台进行深度技术调�
 使用 bash 工具执行深度调研脚本：
 
 ```bash
-node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "<你的问题>"
+node "${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.20-beta" --prompt "<你的问题>"
 ```
 
 **模型限制（强制）**：
-- 只允许 `grok-4.1-thinking` 和 `grok-4.1-thinking.1-expert`
-- 默认使用 `grok-4.1-thinking`
-- 仅当问题特别复杂时使用 `grok-4.1-thinking.1-expert`
-- 只有 `grok-4.1-thinking.1-expert` 允许基于 `conversation_id` 续问
+- 只允许 `grok-4.20-beta` 和 `grok-4.1-expert`
+- 默认使用 `grok-4.20-beta`
+- 仅当问题特别复杂时使用 `grok-4.1-expert`
+- **禁止多轮对话**（不允许 `--create` / `--conversation`）
 
 **环境变量**：
 - `DEEP_RESEARCH_API_URL`：默认 `http://45.192.97.104:5432`
 - `DEEP_RESEARCH_API_KEY`：必须设置
-- `DEEP_RESEARCH_DEFAULT_MODEL`：默认模型（建议 `grok-4.1-thinking`）
+- `DEEP_RESEARCH_DEFAULT_MODEL`：默认模型（建议 `grok-4.20-beta`）
 
 ## 调用前输出格式
 
@@ -45,31 +45,20 @@ node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinki
 
 ```json
 {
-  "selected_model": "grok-4.1-thinking | grok-4.1-thinking.1-expert",
+  "selected_model": "grok-4.20-beta | grok-4.1-expert",
   "research_prompt": "要发送的完整调研提示词"
 }
 ```
 
 然后再调用脚本。
 
-## 对话续问（Conversation ID）
+## 单轮调用（强制）
 
-仅 `grok-4.1-thinking.1-expert` 首次调用会返回 `conversation_id`（同 `conversation_uuid`）。
+deep-research.mjs 现已**禁用多轮对话**：
 
-```bash
-node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --model "grok-4.1-thinking" --prompt "首轮问题"
-```
-
-续问时必须复用该 ID，且模型必须仍为 heavy：
-
-```bash
-node "${OPENCODE_PLUGIN_DIR}/scripts/deep-research.mjs" --conversation "<conversation_id>" --model "grok-4.1-thinking.1-expert" --prompt "追问问题"
-```
-
-如果前一次是 `grok-4.1-thinking`，则不允许按 conversation 续问；必须重开一次 heavy 调用并带上上下文。
-
-若 heavy 实际执行被上游降级为非 heavy（返回 `actual_model` 非 `grok-4.1-thinking.1-expert` 或 `restart_required: true`），
-该会话 ID 会被自动禁用，后续必须重开新 heavy 调用。
+- 不会返回 `conversation_id`
+- 传入 `--create` 或 `--conversation` 会直接报错
+- 需要追问时，必须把上轮结论作为上下文写入新的 prompt，重新发起单轮请求
 
 ## 主线程串行调用（强制）
 
@@ -79,9 +68,9 @@ deep-research.mjs 仅允许主线程串行调用，不允许并行运行。
 ## 执行流程
 
 ```
-1. 构造调研问题
+1. 构造调研问题（必要时把已有上下文完整写入）
    ↓
-2. 调用深度调研脚本
+2. 调用深度调研脚本（单轮）
    ↓
 3. 等待 API 响应（可能需要较长时间）
    ↓
@@ -117,14 +106,6 @@ deep-research.mjs 仅允许主线程串行调用，不允许并行运行。
 ## 上下文背景
 【背景】{上下文背景} [当前任务、为什么需要这个信息、已知相关信息]
 
-## 相关伪代码
-
-    ```pseudo
-    【当前代码逻辑】[简化代码逻辑，展示问题所在位置]
-    [用 // ← 不确定 标注关键位置]
-
-    ```
-
 ## 技术约束
 【技术环境】
 - 技术栈：[语言/框架/版本]（如有）
@@ -140,6 +121,7 @@ deep-research.mjs 仅允许主线程串行调用，不允许并行运行。
 请提供 {期望输出}。如有多种方案，请说明优缺点和适用场景:[代码示例/配置方式/最佳实践/对比分析等]
 
 ```
+
 ## 结果处理
 
 调研结果会以 JSON 格式返回，包含：
@@ -147,20 +129,22 @@ deep-research.mjs 仅允许主线程串行调用，不允许并行运行。
 ```json
 {
   "success": true,
-  "selected_model": "grok-4.1-thinking",
+  "selected_model": "grok-4.20-beta",
+  "actual_model": "grok-4.20-beta",
   "research_prompt": "发送的提示词",
   "answer": "调研结果内容...",
   "usage": { "prompt_tokens": 100, "completion_tokens": 500 }
 }
 ```
 
-heavy 首次调用示例：
+如果 expert 调用被上游拒绝，可能自动降级：
 
 ```json
 {
   "success": true,
-  "conversation_id": "uuid",
-  "selected_model": "grok-4.1-thinking.1-expert",
+  "selected_model": "grok-4.1-expert",
+  "actual_model": "grok-4.20-beta",
+  "fallback_from": "grok-4.1-expert",
   "research_prompt": "发送的提示词",
   "answer": "调研结果内容..."
 }
@@ -181,6 +165,7 @@ heavy 首次调用示例：
 2. **问题质量**：问题越具体，结果越有价值
 3. **结果验证**：调研结果仅供参考，关键信息需要验证
 4. **成本意识**：每次调用都会消耗 API 额度
+5. **单轮限制**：追问必须重发新请求，并在 prompt 中补充上下文
 
 ## 与其他工具配合
 

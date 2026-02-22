@@ -86,7 +86,7 @@ describe("Agent Config Integration", () => {
   describe("Display name resolution", () => {
     test("returns correct display names for all builtin agents", () => {
       // given - lowercase config keys
-      const agents = ["sisyphus", "atlas", "prometheus", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const agents = ["sisyphus", "atlas", "prometheus", "metis", "momus", "oracle", "librarian", "explore", "browser-tester", "athena", "multimodal-looker"]
 
       // when - display names are requested
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
@@ -100,6 +100,8 @@ describe("Agent Config Integration", () => {
       expect(displayNames).toContain("oracle")
       expect(displayNames).toContain("librarian")
       expect(displayNames).toContain("explore")
+      expect(displayNames).toContain("Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)")
+      expect(displayNames).toContain("Athena (业务分析智能体，需求梳理与验收定义)")
       expect(displayNames).toContain("multimodal-looker")
     })
 
@@ -145,7 +147,7 @@ describe("Agent Config Integration", () => {
 
     test("model requirements include all builtin agents", () => {
       // given - expected builtin agents
-      const expectedAgents = ["sisyphus", "atlas", "prometheus", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const expectedAgents = ["sisyphus", "atlas", "prometheus", "metis", "momus", "oracle", "librarian", "explore", "browser-tester", "multimodal-looker"]
 
       // when - checking AGENT_MODEL_REQUIREMENTS
       const agentKeys = Object.keys(AGENT_MODEL_REQUIREMENTS)
