@@ -5,6 +5,7 @@ import {
   CategoryConfigSchema,
   ExperimentalConfigSchema,
   GitMasterConfigSchema,
+  HookNameSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 describe("disabled_mcps schema", () => {
@@ -387,6 +388,19 @@ describe("BuiltinCategoryNameSchema", () => {
       const result = BuiltinCategoryNameSchema.safeParse(cat)
       expect(result.success).toBe(true)
     }
+  })
+})
+
+describe("HookNameSchema", () => {
+  test("rejects removed beast-mode-system hook name", () => {
+    //#given
+    const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 })
 
