@@ -25,8 +25,13 @@ description: "深度调研工具 - 通过外部 AI 平台进行深度技术调�
 使用 bash 工具执行深度调研脚本：
 
 ```bash
-node "${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.20-beta" --prompt "<你的问题>"
+node "<oh-my-opencode安装目录>/scripts/deep-research.mjs" --model "grok-4.20-beta" --prompt "<你的问题>"
 ```
+
+说明：
+- 不要写死机器路径（如 `I:/...`）。
+- 始终使用当前环境中 **oh-my-opencode 的实际安装目录**。
+- Librarian 已改为运行时自动解析该目录并调用对应 `scripts/deep-research.mjs`。
 
 **模型限制（强制）**：
 - 只允许 `grok-4.20-beta` 和 `grok-4.1-expert`

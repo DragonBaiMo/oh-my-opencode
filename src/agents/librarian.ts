@@ -1,8 +1,17 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
+
+function resolveDeepResearchScriptPath(): string {
+  const modulePath = fileURLToPath(import.meta.url)
+  const moduleDir = dirname(modulePath)
+  const packageRoot = resolve(moduleDir, "..", "..")
+  return join(packageRoot, "scripts", "deep-research.mjs").replace(/\\/g, "/")
+}
 
 export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -22,6 +31,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createLibrarianAgent(model: string): AgentConfig {
+  const deepResearchScriptPath = resolveDeepResearchScriptPath()
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
@@ -32,14 +42,14 @@ export function createLibrarianAgent(model: string): AgentConfig {
 
   return {
     description:
-      "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI and Deep Research. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source. (Librarian - OhMyOpenCode)",
+      "Multi-repository analysis, searching remote codebases, retrieving official documentation, finding implementation examples. Use when looking up remote repos, library internals, or open source examples.",
     mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
     prompt: `# THE LIBRARIAN
 
-You are **THE LIBRARIAN**, a specialized open-source codebase understanding agent.
+You are a specialized open-source codebase understanding agent.
 
 Your job: Answer questions about open-source libraries by finding **EVIDENCE** with **GitHub permalinks** and **Deep Research**.
 
@@ -85,7 +95,7 @@ Classify EVERY request into one of these categories before taking action:
 
 **How to call** (use bash tool):
 \`\`\`bash
-node "\${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.20-beta" --prompt "你的具体问题"
+node "${deepResearchScriptPath}" --model "grok-4.20-beta" --prompt "你的具体问题"
 \`\`\`
 
 **Good questions for Deep Research**:
@@ -121,7 +131,7 @@ node "\${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.20-b
 Step 1: Deep Research for documentation/best practices
         1) choose model (grok-4.20-beta default, expert only if really hard)
         2) output JSON with selected_model + research_prompt
-        3) node "\${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "<selected_model>" --prompt "<research_prompt>"
+        3) node "${deepResearchScriptPath}" --model "<selected_model>" --prompt "<research_prompt>"
         4) always single-turn; include full context in one prompt
 
 Step 2: Clone repo to verify and find examples
@@ -196,7 +206,7 @@ gh api repos/owner/repo/pulls/<number>/files
 
 \`\`\`
 // Step 1: Documentation & Best Practices (must be sequential)
-Tool 1: node "\${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.1-expert" --prompt "comprehensive question"
+Tool 1: node "${deepResearchScriptPath}" --model "grok-4.1-expert" --prompt "comprehensive question"
 
 // Step 2: Source Analysis (can run after step 1)
 Tool 2: gh repo clone owner/repo \${TMPDIR:-/tmp}/repo -- --depth 1
@@ -260,7 +270,7 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 
 | Purpose | Tool | Command/Usage |
 |---------|------|---------------|
-| **Documentation/Best Practices** | Deep Research (mjs, main-thread only) | \`node "\${OPENCODE_PLUGIN_DIR:-.}/scripts/deep-research.mjs" --model "grok-4.20-beta" --prompt "question"\` |
+| **Documentation/Best Practices** | Deep Research (mjs, main-thread only) | \`node "${deepResearchScriptPath}" --model "grok-4.20-beta" --prompt "question"\` |
 | **Clone Repo** | gh CLI | \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\` |
 | **Code Search** | gh CLI | \`gh search code "query" --repo owner/repo\` |
 | **Issues/PRs** | gh CLI | \`gh search issues/prs "query" --repo owner/repo\` |
