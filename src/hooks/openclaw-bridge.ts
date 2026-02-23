@@ -21,7 +21,6 @@ interface OpenClawBridgeConfig {
   idleConfirmationDelay?: number
   questionTimeoutMs?: number
   autoReplyEnabled?: boolean
-  sendScriptPath?: string
   opencodeBaseUrl?: string
   target_session?: string
   sessionRoutesFile?: string
@@ -48,7 +47,6 @@ const HARDCODED_DEFAULTS: Required<OpenClawBridgeConfig> = {
   idleConfirmationDelay: 2000,
   questionTimeoutMs: 180000,
   autoReplyEnabled: true,
-  sendScriptPath: "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_send.py",
   opencodeBaseUrl: "http://127.0.0.1:4096",
   target_session: "",
   sessionRoutesFile: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications/session-routes.json",
@@ -78,7 +76,6 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (gw.idle_confirmation_delay_ms) result.idleConfirmationDelay = gw.idle_confirmation_delay_ms
         if (gw.question_timeout_ms) result.questionTimeoutMs = gw.question_timeout_ms
         if (typeof gw.auto_reply_enabled === "boolean") result.autoReplyEnabled = gw.auto_reply_enabled
-        if (gw.send_script_path) result.sendScriptPath = gw.send_script_path
         if (gw.opencode_base_url) result.opencodeBaseUrl = gw.opencode_base_url
         if (gw.target_session) result.target_session = gw.target_session
         if (gw.session_routes_file) result.sessionRoutesFile = gw.session_routes_file
@@ -92,7 +89,6 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (raw.idleConfirmationDelay) result.idleConfirmationDelay = raw.idleConfirmationDelay
         if (raw.questionTimeoutMs) result.questionTimeoutMs = raw.questionTimeoutMs
         if (typeof raw.autoReplyEnabled === "boolean") result.autoReplyEnabled = raw.autoReplyEnabled
-        if (raw.sendScriptPath) result.sendScriptPath = raw.sendScriptPath
         if (raw.opencodeBaseUrl) result.opencodeBaseUrl = raw.opencodeBaseUrl
         if (raw.sessionRoutesFile) result.sessionRoutesFile = raw.sessionRoutesFile
         return result
