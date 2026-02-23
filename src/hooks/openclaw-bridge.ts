@@ -390,12 +390,18 @@ function validateAndCorrectRoute(sessionId: string | undefined, resolvedTarget: 
   const state = sessionStates.get(sessionId)
   const remembered = trimToUndefined(state?.targetSession)
   const current = trimToUndefined(resolvedTarget)
+
+  // v2 策略：routes(bySession) 才是当前真相。
+  // 若内存态 remembered 与 routes 当前值冲突，优先采用 current，并标记 routeCorrected。
   if (remembered && current && remembered !== current) {
-    return { targetSession: remembered, routeCorrected: true }
+    return { targetSession: current, routeCorrected: true }
   }
+
+  // 若 routes 暂时不可用（例如文件瞬时读失败），才回退 remembered。
   if (remembered && !current) {
     return { targetSession: remembered, routeCorrected: false }
   }
+
   return { targetSession: current, routeCorrected: false }
 }
 
