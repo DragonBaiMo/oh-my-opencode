@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { readFileSync, existsSync, writeFileSync } from "fs"
-import { basename, dirname, join } from "path"
-import { spawn } from "child_process"
+import { basename, join } from "path"
 
 /**
  * openclaw-bridge hook
@@ -467,96 +466,6 @@ function buildUserNotificationText(params:
   return lines.join("\n")
 }
 
-type ProcessResult = {
-  ok: boolean
-  stdout: string
-}
-
-async function runProcess(
-  command: string,
-  args: string[],
-  cwd: string,
-  timeoutMs: number,
-): Promise<ProcessResult> {
-  return await new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-
-    let stdout = ""
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL")
-      resolve({ ok: false, stdout })
-    }, timeoutMs)
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString()
-    })
-    child.on("error", () => {
-      clearTimeout(timer)
-      resolve({ ok: false, stdout })
-    })
-    child.on("exit", (code) => {
-      clearTimeout(timer)
-      resolve({ ok: code === 0, stdout })
-    })
-  })
-}
-
-function extractPortFromBaseUrl(baseUrl: string): string {
-  try {
-    const url = new URL(baseUrl)
-    return url.port || (url.protocol === "https:" ? "443" : "80")
-  } catch {
-    return "4096"
-  }
-}
-
-async function captureSnapshotForSession(
-  config: Required<OpenClawBridgeConfig>,
-  sessionId: string,
-  baseUrl: string,
-): Promise<string | undefined> {
-  const sendScriptPath = trimToUndefined(config.sendScriptPath)
-  if (!sendScriptPath) return undefined
-
-  const scriptDir = dirname(sendScriptPath)
-  const snapshotScriptPath = join(scriptDir, "oc_snapshot.py")
-  if (!existsSync(snapshotScriptPath)) return undefined
-
-  const outputPath = `/tmp/openclaw-bridge-${sessionId}-${Date.now()}.png`
-  const snapshot = await runProcess(
-    "python3",
-    [snapshotScriptPath, sessionId, outputPath, extractPortFromBaseUrl(baseUrl)],
-    scriptDir,
-    90000,
-  )
-  if (!snapshot.ok) return undefined
-
-  const filesLine = snapshot.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith("SNAPSHOT_FILES="))
-  if (!filesLine) return undefined
-  const first = filesLine.replace(/^SNAPSHOT_FILES=/, "").split("|")[0]
-  return existsSync(first) ? first : undefined
-}
-
-async function sendUserNotification(
-  config: Required<OpenClawBridgeConfig>,
-  text: string,
-  sessionId: string,
-  baseUrl: string,
-): Promise<boolean> {
-  // 旧实现通过 oc_send.py + --channel telegram 直发，导致“Bot 绑死到固定账号”。
-  // 新策略：不在 bridge 里直接发平台消息，统一改为 wake 对应 targetSession。
-  // 这里仍保留截图生成能力，作为后续可选扩展（例如把截图路径写入 wake 文本）。
-  const _snapshotPath = await captureSnapshotForSession(config, sessionId, baseUrl)
-  void _snapshotPath
-  return false
-}
-
 function buildQuestionAutoReplyWakeText(params: {
   workspace: string
   sessionId: string
@@ -826,26 +735,6 @@ export function createOpenClawBridge(
     if (pendingInteractions.has(pendingKey)) {
       return
     }
-
-    const userText = params.kind === "question"
-      ? buildUserNotificationText({
-          kind: "question",
-          workspace,
-          sessionId: params.sessionId,
-          requestId: params.requestId,
-          questions: params.questions,
-          timeoutMs: c.questionTimeoutMs,
-          routeCorrected: params.route.routeCorrected,
-        })
-      : buildUserNotificationText({
-          kind: "permission",
-          workspace,
-          sessionId: params.sessionId,
-          requestId: params.requestId,
-          tool: params.tool,
-          timeoutMs: c.questionTimeoutMs,
-          routeCorrected: params.route.routeCorrected,
-        })
 
     // 不在 bridge 里直接调用 oc_send.py 发平台消息（会绑死 bot/chat）。
     // 统一唤醒对应 targetSession，由 OpenClaw 会话根据当前聊天上下文自行发送截图/文本。
