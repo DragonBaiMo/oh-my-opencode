@@ -3,6 +3,7 @@ import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatDuration } from "./time-format"
+import { generateVerificationReminder } from "../delegate-task/verification-reminder"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
@@ -100,6 +101,16 @@ Session ID: ${task.sessionID}
   const textContent = extractedContent.filter((text) => text.length > 0).join("\n\n")
   const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
+  const verificationReminder = task.sessionID
+    ? generateVerificationReminder({
+        agent: task.agent,
+        category: task.category,
+        description: task.description,
+        prompt: task.prompt,
+        sessionId: task.sessionID,
+      })
+    : ""
+
   return `Task Result
 
 Task ID: ${task.id}
@@ -109,5 +120,7 @@ Session ID: ${task.sessionID}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}
+
+${verificationReminder}`
 }

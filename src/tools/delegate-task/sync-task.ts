@@ -10,6 +10,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { generateVerificationReminder } from "./verification-reminder"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -128,6 +129,13 @@ export async function executeSyncTask(
       }
 
       const duration = formatDuration(startTime)
+      const verificationReminder = generateVerificationReminder({
+        agent: agentToUse,
+        category: args.category,
+        description: args.description,
+        prompt: args.prompt,
+        sessionId: sessionID,
+      })
 
       return `Task completed in ${duration}.
 
@@ -139,7 +147,9 @@ ${result.textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${sessionID}
-</task_metadata>`
+</task_metadata>
+
+${verificationReminder}`
     } finally {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)

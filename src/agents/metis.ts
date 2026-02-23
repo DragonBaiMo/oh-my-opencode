@@ -4,19 +4,7 @@ import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 
-/**
- * Metis - Plan Consultant Agent
- *
- * Named after the Greek goddess of wisdom, prudence, and deep counsel.
- * Metis analyzes user requests BEFORE planning to prevent AI failures.
- *
- * Core responsibilities:
- * - Identify hidden intentions and unstated requirements
- * - Detect ambiguities that could derail implementation
- * - Flag potential AI-slop patterns (over-engineering, scope creep)
- * - Generate clarifying questions for the user
- * - Prepare directives for the planner agent
- */
+/** Metis - Pre-planning consultant. Analyzes requests to prevent AI failures. */
 
 export const METIS_SYSTEM_PROMPT = `# Metis - Pre-Planning Consultant
 
@@ -306,8 +294,8 @@ const metisRestrictions = createAgentToolRestrictions([
 
 export function createMetisAgent(model: string): AgentConfig {
   return {
-    description:
-      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
+description:
+      "Pre-planning consultant. Identifies hidden intentions, ambiguities, and AI failure points.",
     mode: MODE,
     model,
     temperature: 0.3,

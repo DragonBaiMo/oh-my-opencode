@@ -145,44 +145,140 @@ For EACH form:
 
 <output_format>
 
-## Test Report Structure
+## Test Report Structure (MANDATORY - ALL SECTIONS REQUIRED)
+
+**CRITICAL: Reports without Interaction Evidence Chain are INVALID and will be REJECTED.**
 
 ### Summary
 \`\`\`
 PASS: X tests
 FAIL: Y tests
-SKIP: Z tests
+SKIP: Z tests (with reasons)
 Duration: Ns
+\`\`\`
+
+### Interaction Evidence Chain (MANDATORY - NO EXCEPTIONS)
+
+**For EACH interactive element tested, you MUST provide this exact structure:**
+
+\`\`\`json
+{
+  "element": "button#submit / input[name=email] / ...",
+  "selector_used": "CSS selector or DevTools command used",
+  "actions_performed": [
+    { "action": "locate", "timestamp": "T+0ms", "result": "element found, visible: true" },
+    { "action": "hover", "timestamp": "T+10ms", "result": "hover state applied, cursor changed" },
+    { "action": "click", "timestamp": "T+50ms", "result": "click event fired" },
+    { "action": "wait", "duration": "200ms", "condition": "network idle / element visible / ..." },
+    { "action": "verify", "timestamp": "T+250ms", "checks": ["UI updated", "no console errors", "expected state reached"] }
+  ],
+  "response_time_ms": 250,
+  "visual_feedback_observed": {
+    "hover_effect": "background color changed to #eee",
+    "click_effect": "button depressed, ripple animation",
+    "loading_indicator": "spinner appeared for 150ms",
+    "completion_feedback": "success toast displayed"
+  },
+  "console_during_interaction": [],
+  "network_requests_triggered": ["POST /api/submit - 200 OK - 180ms"],
+  "verdict": "PASS",
+  "evidence": "screenshot_001.png (optional but recommended)"
+}
+\`\`\`
+
+**If you cannot provide this evidence chain for an element, you MUST explain why and mark it as SKIPPED, not PASS.**
+
+### User Experience Metrics (MANDATORY)
+
+\`\`\`json
+{
+  "interaction_responsiveness": {
+    "avg_click_to_feedback_ms": 45,
+    "max_click_to_feedback_ms": 120,
+    "target": "<100ms",
+    "status": "PASS/FAIL"
+  },
+  "animation_smoothness": {
+    "jank_detected": false,
+    "frame_drops_observed": 0,
+    "transitions_tested": ["modal open", "dropdown expand"],
+    "status": "PASS/FAIL"
+  },
+  "visual_feedback_quality": {
+    "hover_states_present": true,
+    "active_states_present": true,
+    "focus_indicators_visible": true,
+    "loading_indicators_present": true,
+    "error_states_clear": true,
+    "status": "PASS/FAIL"
+  },
+  "perceived_performance": "fast | acceptable | slow | unacceptable",
+  "user_experience_verdict": "Good | Acceptable | Needs Improvement | Poor"
+}
 \`\`\`
 
 ### Detailed Results
 For each test:
 \`\`\`
 [PASS/FAIL] Test Name
-  - Action: What was tested
+  - DevTools Commands Used: [actual commands executed]
+  - Action: What was tested (with specific selectors)
   - Expected: Expected behavior
-  - Actual: What happened
-  - Screenshot: (if failure)
-  - Console: (any errors)
+  - Actual: What happened (with timing)
+  - Response Time: Xms
+  - Screenshot: [filename] (ALWAYS for failures, recommended for passes)
+  - Console Output: [any errors/warnings during this test]
+  - Network Activity: [relevant requests]
 \`\`\`
 
 ### Performance Report
 \`\`\`
-| Metric | Value | Status |
-|--------|-------|--------|
-| FCP    | X.Xs  | ✅/❌  |
-| LCP    | X.Xs  | ✅/❌  |
-| ...    | ...   | ...    |
+| Metric | Value | Target | Critical | Status |
+|--------|-------|--------|----------|--------|
+| FCP    | X.Xs  | <1.8s  | <3s      | ✅/❌  |
+| LCP    | X.Xs  | <2.5s  | <4s      | ✅/❌  |
+| TTI    | X.Xs  | <3.8s  | <7.3s    | ✅/❌  |
+| CLS    | X.XX  | <0.1   | <0.25    | ✅/❌  |
+| FID    | Xms   | <100ms | <300ms   | ✅/❌  |
+\`\`\`
+
+### Skipped Items (MANDATORY if any skipped)
+\`\`\`json
+{
+  "skipped_tests": [
+    { "test": "mobile viewport", "reason": "not in scope", "impact": "low" },
+    { "test": "slow network simulation", "reason": "dev environment limitation", "impact": "medium" }
+  ],
+  "total_skipped": 2,
+  "skip_justification": "Skipped items do not affect core functionality verification"
+}
 \`\`\`
 
 ### Issues Found
-Priority-ordered list:
-1. [CRITICAL] Issue description + reproduction steps
-2. [HIGH] Issue description + reproduction steps
-3. [MEDIUM] Issue description + reproduction steps
+Priority-ordered list with actionable fixes:
+1. [CRITICAL] Issue + reproduction steps + suggested fix + affected users %
+2. [HIGH] Issue + reproduction steps + suggested fix + affected users %
+3. [MEDIUM] Issue + reproduction steps + suggested fix + affected users %
 
-### Recommendations
-Actionable fixes for each issue found.
+### Test Confidence Assessment (MANDATORY)
+\`\`\`json
+{
+  "confidence_level": "high | medium | low",
+  "confidence_factors": {
+    "interaction_coverage": "X/Y elements tested with full evidence chain",
+    "edge_cases_tested": ["rapid clicks", "form validation", "..."],
+    "environments_tested": ["desktop Chrome"]
+  },
+  "limitations": [
+    "Did not test on mobile viewports",
+    "Did not test with slow network"
+  ],
+  "coverage_gaps": [
+    "Edge case: concurrent form submissions not tested"
+  ],
+  "recommendation": "Ready for production | Needs additional testing | Blocking issues found"
+}
+\`\`\`
 
 </output_format>
 
@@ -220,7 +316,7 @@ export function createBrowserTesterAgent(model: string): AgentConfig {
   return {
     
     description:
-      "Browser regression testing agent with Chrome DevTools. Performs comprehensive UI testing, performance profiling, and accessibility checks until all tests pass. (BrowserTester - OhMyOpenCode)",
+      "Browser regression testing agent with Chrome DevTools. Performs UI testing, performance profiling, and accessibility checks.",
     mode: MODE,
     model,
     temperature: 0.1,
