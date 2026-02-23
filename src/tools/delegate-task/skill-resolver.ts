@@ -3,6 +3,7 @@ import {
   extractSkillTemplate,
   getAllSkills,
   injectGitMasterConfig,
+  injectDeepResearchScriptPath,
 } from "../../features/opencode-skill-loader/skill-content"
 
 function normalizeAgentName(agent?: string): string | undefined {
@@ -59,7 +60,7 @@ export async function resolveSkillContent(
       continue
     }
 
-    const template = extractSkillTemplate(skill)
+    const template = injectDeepResearchScriptPath(extractSkillTemplate(skill))
     if (name === "git-master") {
       resolved.set(name, injectGitMasterConfig(template, options.gitMasterConfig))
     } else {

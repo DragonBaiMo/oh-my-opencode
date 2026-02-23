@@ -1,6 +1,7 @@
 import { createBuiltinSkills } from "../builtin-skills/skills"
 import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
+import { injectDeepResearchScriptPath } from "./deep-research-template-injection"
 import { injectGitMasterConfig } from "./git-master-template-injection"
 import { getAllSkills } from "./skill-discovery"
 import { extractSkillTemplate } from "./loaded-skill-template-extractor"
@@ -12,11 +13,15 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
 	const skill = skills.find((builtinSkill) => builtinSkill.name === skillName)
 	if (!skill) return null
 
-	if (skillName === "git-master") {
-		return injectGitMasterConfig(skill.template, options?.gitMasterConfig)
-	}
+  if (skillName === "git-master") {
+    return injectGitMasterConfig(skill.template, options?.gitMasterConfig)
+  }
 
-	return skill.template
+  if (skillName === "deep-research") {
+    return injectDeepResearchScriptPath(skill.template)
+  }
+
+  return skill.template
 }
 
 export function resolveMultipleSkills(
@@ -36,6 +41,8 @@ export function resolveMultipleSkills(
 		if (template) {
 			if (name === "git-master") {
 				resolved.set(name, injectGitMasterConfig(template, options?.gitMasterConfig))
+			} else if (name === "deep-research") {
+				resolved.set(name, injectDeepResearchScriptPath(template))
 			} else {
 				resolved.set(name, template)
 			}
@@ -61,6 +68,10 @@ export async function resolveSkillContentAsync(
 		return injectGitMasterConfig(template, options?.gitMasterConfig)
 	}
 
+	if (skillName === "deep-research") {
+		return injectDeepResearchScriptPath(template)
+	}
+
 	return template
 }
 
@@ -83,6 +94,8 @@ export async function resolveMultipleSkillsAsync(
 			const template = await extractSkillTemplate(skill)
 			if (name === "git-master") {
 				resolved.set(name, injectGitMasterConfig(template, options?.gitMasterConfig))
+			} else if (name === "deep-research") {
+				resolved.set(name, injectDeepResearchScriptPath(template))
 			} else {
 				resolved.set(name, template)
 			}

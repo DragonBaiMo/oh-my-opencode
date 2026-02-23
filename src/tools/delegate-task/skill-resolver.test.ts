@@ -88,4 +88,16 @@ discovered body`
     expect(result.content).toContain("Acceptance Criteria")
     expect(result.content).toContain("Decision Record")
   })
+
+  test("injects deep-research script path placeholder automatically", async () => {
+    //#when
+    const result = await resolveSkillContent(["deep-research"], {
+      targetAgent: "librarian",
+    })
+
+    //#then
+    expect(result.error).toBeNull()
+    expect(result.content).toContain("scripts/deep-research.mjs")
+    expect(result.content).not.toContain("{{DEEP_RESEARCH_SCRIPT_PATH}}")
+  })
 })
