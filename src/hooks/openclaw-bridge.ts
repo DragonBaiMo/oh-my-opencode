@@ -220,6 +220,7 @@ const sessionStates = new Map<string, {
   title: string
   agent: string
   workspace: string
+  parentID?: string          // 有 parentID = 子 session，不触发 wake
   targetSession?: string
   lastActivity: number
   idleTimer: ReturnType<typeof setTimeout> | null
@@ -346,12 +347,14 @@ export function createOpenClawBridge(
       const info = props?.info as Record<string, unknown> | undefined
       const sessionId = info?.id as string | undefined
       if (sessionId) {
+        const parentID = info?.parentID as string | undefined
         const targetSession = resolveTargetSession(c, workspace, sessionId)
         sessionStates.set(sessionId, {
           status: "created",
           title: (info?.title as string) || "",
           agent: "",
           workspace,
+          parentID: parentID || undefined,
           targetSession,
           lastActivity: Date.now(),
           idleTimer: null,
@@ -359,6 +362,7 @@ export function createOpenClawBridge(
         await writeNotification(c, "session.created", {
           sessionId,
           title: info?.title || "",
+          parentID: parentID || "",
           workspace,
           targetSession,
         })
@@ -369,6 +373,20 @@ export function createOpenClawBridge(
     const sessionId = getSessionID(props)
     const stateTargetSession = sessionId ? sessionStates.get(sessionId)?.targetSession : undefined
     const targetSession = stateTargetSession || resolveTargetSession(c, workspace, sessionId)
+
+    // 子 session（有 parentID）不触发 wakeOpenClaw，只写文件通知
+    // 子 session 完成后主 session 会自动继续，无需打扰用户
+    const isChildSession = (() => {
+      if (sessionId) {
+        const state = sessionStates.get(sessionId)
+        if (state?.parentID) return true
+      }
+      // 也检查事件 properties 里的 parentID（兜底）
+      const info = props?.info as Record<string, unknown> | undefined
+      if (info?.parentID) return true
+      if (props?.parentID) return true
+      return false
+    })()
 
     // Question（显式事件）
     if (QUESTION_EVENTS.has(event.type) && sessionId) {
@@ -381,9 +399,13 @@ export function createOpenClawBridge(
         workspace,
         requestId,
         targetSession,
+        isChild: isChildSession,
         questions,
       })
-      await wakeOpenClaw(c, text, targetSession)
+      // 子 session 的 question 由主 agent 自行处理，不打扰用户
+      if (!isChildSession) {
+        await wakeOpenClaw(c, text, targetSession)
+      }
       return
     }
 
@@ -399,8 +421,12 @@ export function createOpenClawBridge(
         requestId,
         tool,
         targetSession,
+        isChild: isChildSession,
       })
-      await wakeOpenClaw(c, text, targetSession)
+      // 子 session 的 permission 由主 agent 自行处理
+      if (!isChildSession) {
+        await wakeOpenClaw(c, text, targetSession)
+      }
       return
     }
 
@@ -417,10 +443,13 @@ export function createOpenClawBridge(
           workspace,
           requestId,
           targetSession,
+          isChild: isChildSession,
           tool: toolName,
           questions,
         })
-        await wakeOpenClaw(c, text, targetSession)
+        if (!isChildSession) {
+          await wakeOpenClaw(c, text, targetSession)
+        }
       }
       return
     }
@@ -431,7 +460,21 @@ export function createOpenClawBridge(
       const state = sessionStates.get(sessionId)
       if (state?.idleTimer) clearTimeout(state.idleTimer)
 
-      // 延迟确认 idle（避免短暂 idle 误报）
+      // 子 session idle 不唤醒用户，只写文件记录
+      if (isChildSession) {
+        if (state) state.status = "idle"
+        await writeNotification(c, "session.idle", {
+          sessionId,
+          title: state?.title || "",
+          agent: state?.agent || "",
+          workspace: state?.workspace || workspace,
+          targetSession,
+          isChild: true,
+        })
+        return
+      }
+
+      // 主 session：延迟确认 idle（避免短暂 idle 误报）
       const timer = setTimeout(async () => {
         const s = sessionStates.get(sessionId)
         if (s) s.status = "idle"
@@ -478,13 +521,17 @@ export function createOpenClawBridge(
         error,
         workspace: stateWorkspace,
         targetSession: stateTarget,
+        isChild: isChildSession,
       })
 
-      await wakeOpenClaw(
-        c,
-        `[OpenCode 错误] workspace="${stateWorkspace}" session=${sessionId} error="${error}" — 请检查并处理。`,
-        stateTarget
-      )
+      // 子 session error 不打扰用户，主 agent 会处理
+      if (!isChildSession) {
+        await wakeOpenClaw(
+          c,
+          `[OpenCode 错误] workspace="${stateWorkspace}" session=${sessionId} error="${error}" — 请检查并处理。`,
+          stateTarget
+        )
+      }
       return
     }
 
