@@ -22,7 +22,6 @@ interface OpenClawBridgeConfig {
   questionTimeoutMs?: number
   autoReplyEnabled?: boolean
   opencodeBaseUrl?: string
-  target_session?: string
   sessionRoutesFile?: string
 }
 
@@ -48,7 +47,6 @@ const HARDCODED_DEFAULTS: Required<OpenClawBridgeConfig> = {
   questionTimeoutMs: 180000,
   autoReplyEnabled: true,
   opencodeBaseUrl: "http://127.0.0.1:4096",
-  target_session: "",
   sessionRoutesFile: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications/session-routes.json",
 }
 
@@ -77,14 +75,12 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (gw.question_timeout_ms) result.questionTimeoutMs = gw.question_timeout_ms
         if (typeof gw.auto_reply_enabled === "boolean") result.autoReplyEnabled = gw.auto_reply_enabled
         if (gw.opencode_base_url) result.opencodeBaseUrl = gw.opencode_base_url
-        if (gw.target_session) result.target_session = gw.target_session
         if (gw.session_routes_file) result.sessionRoutesFile = gw.session_routes_file
         if (notif.output_dir) result.notificationsDir = notif.output_dir
         if (raw.opencode?.base_port) result.opencodeBaseUrl = `http://127.0.0.1:${raw.opencode.base_port}`
         // 也支持直接平铺格式（openclaw-bridge.config.json）
         if (raw.gatewayUrl) result.gatewayUrl = raw.gatewayUrl
         if (raw.hookToken) result.hookToken = raw.hookToken
-        if (raw.target_session) result.target_session = raw.target_session
         if (raw.notificationsDir) result.notificationsDir = raw.notificationsDir
         if (raw.idleConfirmationDelay) result.idleConfirmationDelay = raw.idleConfirmationDelay
         if (raw.questionTimeoutMs) result.questionTimeoutMs = raw.questionTimeoutMs
@@ -205,11 +201,7 @@ function persistSessionRoute(
 }
 
 function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace: string, sessionId?: string): string | undefined {
-  // 1) 明确配置优先
-  const fixed = trimToUndefined(config.target_session)
-  if (fixed) return fixed
-
-  // 2) 文件路由（v2 仅支持 workspace::sid；兼容读取旧 sid 裸键）
+  // 1) 文件路由（v2 仅支持 workspace::sid；兼容读取旧 sid 裸键）
   const routes = readSessionRoutes(config.sessionRoutesFile)
   const bySession = routes.bySession || {}
 
@@ -223,7 +215,7 @@ function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace:
     if (plain) return plain
   }
 
-  // 3) 环境变量最终兜底
+  // 2) 环境变量最终兜底
   const envSession = trimToUndefined(process.env.OPENCLAW_TARGET_SESSION) || trimToUndefined(process.env.OPENCLAW_SESSION_KEY)
   if (envSession) return envSession
 
