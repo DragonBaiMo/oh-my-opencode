@@ -222,6 +222,15 @@ function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace:
   return undefined
 }
 
+
+function resolveRouteFromFileOnly(config: Required<OpenClawBridgeConfig>, workspace: string, sessionId?: string): string | undefined {
+  if (!sessionId) return undefined
+  const routes = readSessionRoutes(config.sessionRoutesFile)
+  const bySession = routes.bySession || {}
+  const compositeKey = `${workspace}::${sessionId}`
+  return trimToUndefined(bySession[compositeKey]) || trimToUndefined(bySession[sessionId])
+}
+
 function resolveWorkspace(ctx: PluginInput): string {
   return (
     trimToUndefined((ctx.project as { worktree?: string } | undefined)?.worktree) ||
@@ -745,13 +754,16 @@ export function createOpenClawBridge(
           requestId: params.requestId,
           tool: params.tool,
         })
-    await wakeOpenClaw(c, wakeText, params.route.targetSession)
+
+    // question/permission 这种关键事件，发送前强制再读一次 routes 文件，避免使用陈旧内存态 target
+    const freshTarget = resolveRouteFromFileOnly(c, workspace, params.sessionId) || params.route.targetSession
+    await wakeOpenClaw(c, wakeText, freshTarget)
 
     startPendingTimer({
       kind: params.kind,
       sessionId: params.sessionId,
       requestId: params.requestId,
-      targetSession: params.route.targetSession,
+      targetSession: freshTarget,
       routeCorrected: params.route.routeCorrected,
       tool: params.tool,
       questions: params.kind === "question" ? params.questions : undefined,
