@@ -25,6 +25,7 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createOpenClawBridge,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -60,6 +61,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  openclawBridge: ReturnType<typeof createOpenClawBridge> | null
 }
 
 export function createSessionHooks(args: {
@@ -258,6 +260,9 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+  const openclawBridge = isHookEnabled("openclaw-bridge")
+    ? safeHook("openclaw-bridge", () => createOpenClawBridge(ctx))
+    : null
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -282,5 +287,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    openclawBridge,
   }
 }
