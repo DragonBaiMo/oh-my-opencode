@@ -28,8 +28,17 @@ interface OpenClawBridgeConfig {
   sessionRoutesFile?: string
 }
 
+type DeliveryRoute = {
+  channel: string
+  accountId: string
+  target: string
+}
+
 type SessionRouteFile = {
+  version?: number
   bySession?: Record<string, string>
+  deliveryBySession?: Record<string, DeliveryRoute>
+  // legacy (v1)
   byWorkspace?: Record<string, string>
 }
 
@@ -186,10 +195,11 @@ function persistSessionRoute(
   const routes = readSessionRoutes(config.sessionRoutesFile)
   const bySession = routes.bySession || {}
   bySession[`${workspace}::${sessionId}`] = targetSession
-  bySession[sessionId] = targetSession
+
   const next: SessionRouteFile = {
+    version: 2,
     bySession,
-    byWorkspace: routes.byWorkspace || {},
+    deliveryBySession: routes.deliveryBySession || {},
   }
   try {
     writeFileSync(config.sessionRoutesFile, JSON.stringify(next, null, 2))
@@ -204,29 +214,23 @@ function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace:
   const fixed = trimToUndefined(config.target_session)
   if (fixed) return fixed
 
-  // 2) 环境变量兜底
-  const envSession = trimToUndefined(process.env.OPENCLAW_TARGET_SESSION) || trimToUndefined(process.env.OPENCLAW_SESSION_KEY)
-  if (envSession) return envSession
-
-  // 3) 文件路由（支持 workspace + session）
+  // 2) 文件路由（v2 仅支持 workspace::sid；兼容读取旧 sid 裸键）
   const routes = readSessionRoutes(config.sessionRoutesFile)
   const bySession = routes.bySession || {}
-  const byWorkspace = routes.byWorkspace || {}
 
   if (sessionId) {
     const compositeKey = `${workspace}::${sessionId}`
     const exact = trimToUndefined(bySession[compositeKey])
     if (exact) return exact
 
+    // legacy fallback（仅读，不再写）
     const plain = trimToUndefined(bySession[sessionId])
     if (plain) return plain
   }
 
-  const workspaceExact = trimToUndefined(byWorkspace[workspace])
-  if (workspaceExact) return workspaceExact
-
-  const workspaceBase = trimToUndefined(byWorkspace[basename(workspace)])
-  if (workspaceBase) return workspaceBase
+  // 3) 环境变量最终兜底
+  const envSession = trimToUndefined(process.env.OPENCLAW_TARGET_SESSION) || trimToUndefined(process.env.OPENCLAW_SESSION_KEY)
+  if (envSession) return envSession
 
   return undefined
 }
@@ -545,30 +549,12 @@ async function sendUserNotification(
   sessionId: string,
   baseUrl: string,
 ): Promise<boolean> {
-  const scriptPath = trimToUndefined(config.sendScriptPath)
-  if (!scriptPath) return false
-
-  const scriptDir = dirname(scriptPath)
-  const snapshotPath = await captureSnapshotForSession(config, sessionId, baseUrl)
-  let imageSent = false
-  if (snapshotPath) {
-    const image = await runProcess(
-      "python3",
-      [scriptPath, "--channel", "telegram", "image", snapshotPath, "OpenCode 等待你的处理"],
-      scriptDir,
-      30000,
-    )
-    imageSent = image.ok
-  }
-
-  const sent = await runProcess(
-    "python3",
-    [scriptPath, "--channel", "telegram", "text", text],
-    scriptDir,
-    30000,
-  )
-
-  return sent.ok
+  // 旧实现通过 oc_send.py + --channel telegram 直发，导致“Bot 绑死到固定账号”。
+  // 新策略：不在 bridge 里直接发平台消息，统一改为 wake 对应 targetSession。
+  // 这里仍保留截图生成能力，作为后续可选扩展（例如把截图路径写入 wake 文本）。
+  const _snapshotPath = await captureSnapshotForSession(config, sessionId, baseUrl)
+  void _snapshotPath
+  return false
 }
 
 function buildQuestionAutoReplyWakeText(params: {
@@ -861,24 +847,22 @@ export function createOpenClawBridge(
           routeCorrected: params.route.routeCorrected,
         })
 
-    const notified = await sendUserNotification(c, userText, params.sessionId, openCodeBaseUrl)
-    if (!notified) {
-      const fallbackText = params.kind === "question"
-        ? buildQuestionWakeText({
-            workspace,
-            sessionId: params.sessionId,
-            requestId: params.requestId,
-            questions: params.questions,
-          })
-        : buildPermissionWakeText({
-            workspace,
-            sessionId: params.sessionId,
-            requestId: params.requestId,
-            tool: params.tool,
-          })
-      await wakeOpenClaw(c, fallbackText, params.route.targetSession)
-      return
-    }
+    // 不在 bridge 里直接调用 oc_send.py 发平台消息（会绑死 bot/chat）。
+    // 统一唤醒对应 targetSession，由 OpenClaw 会话根据当前聊天上下文自行发送截图/文本。
+    const wakeText = params.kind === "question"
+      ? buildQuestionWakeText({
+          workspace,
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          questions: params.questions,
+        })
+      : buildPermissionWakeText({
+          workspace,
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          tool: params.tool,
+        })
+    await wakeOpenClaw(c, wakeText, params.route.targetSession)
 
     startPendingTimer({
       kind: params.kind,
