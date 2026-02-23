@@ -777,6 +777,10 @@ export function createOpenClawBridge(
           lastActivity: Date.now(),
           idleTimer: null,
         })
+        // v2 防串线：session.created 到达时路由文件可能尚未写入，先不缓存目标；
+        // 以首次后续事件解析到的 routes(bySession) 为准，避免锁死到旧目标。
+        const createdState = sessionStates.get(sessionId)
+        if (createdState) createdState.targetSession = undefined
         await writeNotification(c, "session.created", {
           sessionId,
           title: info?.title || "",
