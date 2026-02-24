@@ -286,22 +286,28 @@ function runQuestionCardSend(params: {
   requestId?: string
   title: string
   options: string[]
+  kind?: "question" | "permission"
 }): Promise<SnapshotResult> {
   return new Promise((resolve) => {
-    const html = `<!doctype html><html><head><meta charset=\"utf-8\" />
+    const kindLabel = params.kind === "permission" ? "OpenCode Permission" : "OpenCode Question"
+    const headColor = params.kind === "permission" ? "#b45309" : "#1d4ed8"
+    const borderColor = params.kind === "permission" ? "#fde68a" : "#dbe7ff"
+    const badgeBg = params.kind === "permission" ? "#fff7ed" : "#e0edff"
+
+    const html = `<!doctype html><html><head><meta charset="utf-8" />
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f8fb;margin:0;padding:24px;color:#0f172a}
-.card{background:#fff;border:1px solid #dbe7ff;border-radius:14px;padding:18px 20px;box-shadow:0 8px 26px rgba(15,23,42,.08)}
-.head{font-size:13px;font-weight:700;color:#1d4ed8;letter-spacing:.03em;margin-bottom:10px}
+.card{background:#fff;border:1px solid ${borderColor};border-radius:14px;padding:18px 20px;box-shadow:0 8px 26px rgba(15,23,42,.08)}
+.head{font-size:13px;font-weight:700;color:${headColor};letter-spacing:.03em;margin-bottom:10px}
 .q{font-size:17px;font-weight:600;margin-bottom:14px;line-height:1.45}
 .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;margin:7px 0}
-.badge{width:22px;height:22px;border-radius:6px;background:#e0edff;color:#1d4ed8;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 22px}
+.badge{width:22px;height:22px;border-radius:6px;background:${badgeBg};color:${headColor};font-weight:700;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 22px}
 .meta{margin-top:12px;color:#64748b;font-size:12px}
 </style></head><body>
-<div class=\"card\"><div class=\"head\">OpenCode Question</div>
-<div class=\"q\">${params.title}</div>
-${(params.options || []).map((o, i) => `<div class=\"opt\"><div class=\"badge\">${String.fromCharCode(65 + i)}</div><div>${o}</div></div>`).join("")}
-<div class=\"meta\">request=${params.requestId || "-"} · session=${params.sessionId}</div></div>
+<div class="card"><div class="head">${kindLabel}</div>
+<div class="q">${params.title}</div>
+${(params.options || []).map((o, i) => `<div class="opt"><div class="badge">${String.fromCharCode(65 + i)}</div><div>${o}</div></div>`).join("")}
+<div class="meta">request=${params.requestId || "-"} · session=${params.sessionId}</div></div>
 </body></html>`
 
     const safeId = (params.requestId || params.sessionId).replace(/[^A-Za-z0-9_-]+/g, "_")
@@ -309,11 +315,13 @@ ${(params.options || []).map((o, i) => `<div class=\"opt\"><div class=\"badge\">
     const htmlPath = `${outDir}/question_card_${safeId}.html`
     const pngPath = `${outDir}/question_card_${safeId}.png`
 
-    const writeCmd = `cat > \"${htmlPath}\" <<'HTML'\n${html}\nHTML`
-    const shotCmd = `node \"/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_screenshot.js\" \"${htmlPath}\" \"${pngPath}\" 1200 900`
-    const caption = `OpenCode Question ${params.requestId || params.sessionId}`.replace(/"/g, "\\\"")
-    const sendCmd = `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"${pngPath}\" \"${caption}\"`
-    const cleanupCmd = `rm -f \"${htmlPath}\"`
+    const writeCmd = `cat > "${htmlPath}" <<'HTML'
+${html}
+HTML`
+    const shotCmd = `node "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_screenshot.js" "${htmlPath}" "${pngPath}" 1200 900`
+    const caption = `${kindLabel} ${params.requestId || params.sessionId}`.replace(/"/g, "\"")
+    const sendCmd = `python3 "${OC_SEND_PY}" --workspace "${params.workspace}" --opencode-session "${params.sessionId}" image "${pngPath}" "${caption}"`
+    const cleanupCmd = `rm -f "${htmlPath}"`
     const shell = `${writeCmd} && ${shotCmd} && ${sendCmd} && ${cleanupCmd}`
 
     runCommand(shell).then((res) => {
@@ -760,6 +768,7 @@ export function createOpenClawBridge(
     sessionId: string
     requestId?: string
     questions: Array<{ title: string; options: string[] }>
+    kind?: "question" | "permission"
   }) => {
     dbg("sendQuestionCardSnapshot.start", params)
     const ws = await fetchSessionDirectory(openCodeBaseUrl, params.sessionId)
@@ -781,6 +790,7 @@ export function createOpenClawBridge(
       requestId: params.requestId,
       title: first.title,
       options: first.options,
+      kind: params.kind,
     })
 
     await writeNotification(c, "question.snapshot", {
@@ -1081,7 +1091,7 @@ export function createOpenClawBridge(
           targetSession,
           title: questions[0]?.title,
         })
-        void sendQuestionCardSnapshot({ sessionId, requestId, questions })
+        void sendQuestionCardSnapshot({ sessionId, requestId, questions, kind: "question" })
       }
       return
     }
@@ -1108,6 +1118,22 @@ export function createOpenClawBridge(
         route: routeDecision,
         isChildSession,
       })
+      if (!isChildSession) {
+        await maybeNotifyBusyFallback({
+          kind: "question",
+          sessionId,
+          requestId,
+          workspace,
+          targetSession,
+          title: tool ? `权限确认：${tool}` : "权限确认",
+        })
+        void sendQuestionCardSnapshot({
+          sessionId,
+          requestId,
+          questions: [{ title: tool ? `工具 ${tool} 请求权限，是否允许？` : "工具请求权限，是否允许？", options: ["allow", "deny"] }],
+          kind: "permission",
+        })
+      }
       return
     }
 
@@ -1158,7 +1184,7 @@ export function createOpenClawBridge(
             targetSession,
             title: questions[0]?.title,
           })
-          void sendQuestionCardSnapshot({ sessionId, requestId, questions })
+          void sendQuestionCardSnapshot({ sessionId, requestId, questions, kind: "question" })
         }
       }
       return
