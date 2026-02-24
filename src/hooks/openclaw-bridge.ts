@@ -289,7 +289,9 @@ function runSnapshotAndSend(params: {
   const caption = `OpenCode Question: ${params.questionTitle || params.sessionId}`.replace(/"/g, "\\\"")
   const shell = [
     `SNAP_OUT=$(bash \"${OC_PILOT_SH}\" snapshot ${params.sessionId} \"\" ${params.port})`,
-    `PNG=$(echo \"$SNAP_OUT\" | tail -n 1)`,
+    `FILES=$(echo \"$SNAP_OUT\" | tail -n 1)`,
+    `PNG=$(echo "$FILES" | awk -F'|' '{print $1}')`,
+    `[ -n \"$PNG\" ]`,
     `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"$PNG\" \"${caption}\"`,
   ].join(" && ")
   return runCommand(shell)
