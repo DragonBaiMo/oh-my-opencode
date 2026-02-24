@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { readFileSync, existsSync } from "fs"
-import { basename, join } from "path"
+import { readFileSync, existsSync, writeFileSync } from "fs"
+import { basename, dirname, join } from "path"
+import { spawn } from "child_process"
 
 /**
  * openclaw-bridge hook
@@ -19,6 +20,10 @@ interface OpenClawBridgeConfig {
   hookToken?: string
   notificationsDir?: string
   idleConfirmationDelay?: number
+  questionTimeoutMs?: number
+  autoReplyEnabled?: boolean
+  sendScriptPath?: string
+  opencodeBaseUrl?: string
   target_session?: string
   sessionRoutesFile?: string
 }
@@ -33,6 +38,10 @@ const HARDCODED_DEFAULTS: Required<OpenClawBridgeConfig> = {
   hookToken: "openclaw-hook-bridge-2026",
   notificationsDir: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications",
   idleConfirmationDelay: 2000,
+  questionTimeoutMs: 180000,
+  autoReplyEnabled: true,
+  sendScriptPath: "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_send.py",
+  opencodeBaseUrl: "http://127.0.0.1:4096",
   target_session: "",
   sessionRoutesFile: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications/session-routes.json",
 }
@@ -59,15 +68,24 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (gw.url) result.gatewayUrl = gw.url
         if (gw.hook_token) result.hookToken = gw.hook_token
         if (gw.idle_confirmation_delay_ms) result.idleConfirmationDelay = gw.idle_confirmation_delay_ms
+        if (gw.question_timeout_ms) result.questionTimeoutMs = gw.question_timeout_ms
+        if (typeof gw.auto_reply_enabled === "boolean") result.autoReplyEnabled = gw.auto_reply_enabled
+        if (gw.send_script_path) result.sendScriptPath = gw.send_script_path
+        if (gw.opencode_base_url) result.opencodeBaseUrl = gw.opencode_base_url
         if (gw.target_session) result.target_session = gw.target_session
         if (gw.session_routes_file) result.sessionRoutesFile = gw.session_routes_file
         if (notif.output_dir) result.notificationsDir = notif.output_dir
+        if (raw.opencode?.base_port) result.opencodeBaseUrl = `http://127.0.0.1:${raw.opencode.base_port}`
         // 也支持直接平铺格式（openclaw-bridge.config.json）
         if (raw.gatewayUrl) result.gatewayUrl = raw.gatewayUrl
         if (raw.hookToken) result.hookToken = raw.hookToken
         if (raw.target_session) result.target_session = raw.target_session
         if (raw.notificationsDir) result.notificationsDir = raw.notificationsDir
         if (raw.idleConfirmationDelay) result.idleConfirmationDelay = raw.idleConfirmationDelay
+        if (raw.questionTimeoutMs) result.questionTimeoutMs = raw.questionTimeoutMs
+        if (typeof raw.autoReplyEnabled === "boolean") result.autoReplyEnabled = raw.autoReplyEnabled
+        if (raw.sendScriptPath) result.sendScriptPath = raw.sendScriptPath
+        if (raw.opencodeBaseUrl) result.opencodeBaseUrl = raw.opencodeBaseUrl
         if (raw.sessionRoutesFile) result.sessionRoutesFile = raw.sessionRoutesFile
         return result
       } catch (_) {
@@ -159,6 +177,28 @@ function readSessionRoutes(filePath: string): SessionRouteFile {
   }
 }
 
+function persistSessionRoute(
+  config: Required<OpenClawBridgeConfig>,
+  workspace: string,
+  sessionId: string,
+  targetSession: string,
+): boolean {
+  const routes = readSessionRoutes(config.sessionRoutesFile)
+  const bySession = routes.bySession || {}
+  bySession[`${workspace}::${sessionId}`] = targetSession
+  bySession[sessionId] = targetSession
+  const next: SessionRouteFile = {
+    bySession,
+    byWorkspace: routes.byWorkspace || {},
+  }
+  try {
+    writeFileSync(config.sessionRoutesFile, JSON.stringify(next, null, 2))
+    return true
+  } catch {
+    return false
+  }
+}
+
 function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace: string, sessionId?: string): string | undefined {
   // 1) 明确配置优先
   const fixed = trimToUndefined(config.target_session)
@@ -199,6 +239,28 @@ function resolveWorkspace(ctx: PluginInput): string {
   )
 }
 
+function getParentIDFromProps(properties: Record<string, unknown> | undefined): string | undefined {
+  const info = properties?.info as Record<string, unknown> | undefined
+  const infoParent = info?.parent as Record<string, unknown> | undefined
+  return (
+    trimToUndefined(info?.parentID) ||
+    trimToUndefined(info?.parentId) ||
+    trimToUndefined(info?.parent_id) ||
+    trimToUndefined(infoParent?.id) ||
+    trimToUndefined(properties?.parentID) ||
+    trimToUndefined(properties?.parentId) ||
+    trimToUndefined(properties?.parent_id)
+  )
+}
+
+function safeJson(value: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch {
+    return String(value)
+  }
+}
+
 const QUESTION_EVENTS = new Set([
   "question.ask",
   "question.asked",
@@ -214,6 +276,24 @@ const PERMISSION_EVENTS = new Set([
 
 const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
 
+type PendingInteractionKind = "question" | "permission"
+
+type PendingInteraction = {
+  key: string
+  kind: PendingInteractionKind
+  sessionId: string
+  requestId?: string
+  workspace: string
+  targetSession?: string
+  createdAt: number
+  timer: ReturnType<typeof setTimeout>
+}
+
+type RouteDecision = {
+  targetSession?: string
+  routeCorrected: boolean
+}
+
 // 跟踪 session 状态
 const sessionStates = new Map<string, {
   status: string
@@ -225,6 +305,305 @@ const sessionStates = new Map<string, {
   lastActivity: number
   idleTimer: ReturnType<typeof setTimeout> | null
 }>()
+
+const pendingInteractions = new Map<string, PendingInteraction>()
+const pendingKeysBySession = new Map<string, Set<string>>()
+
+function buildPendingKey(params: {
+  kind: PendingInteractionKind
+  sessionId: string
+  requestId?: string
+  tool?: string
+  questions?: Array<{ title: string; options: string[] }>
+}) {
+  const requestPart = params.requestId
+  if (requestPart) return `${params.kind}:${params.sessionId}:${requestPart}`
+
+  if (params.kind === "permission") {
+    const tool = params.tool || "unknown"
+    return `${params.kind}:${params.sessionId}:tool:${tool}`
+  }
+
+  const firstQuestion = params.questions?.[0]?.title || "unknown"
+  return `${params.kind}:${params.sessionId}:q:${firstQuestion.slice(0, 120)}`
+}
+
+function registerPendingForSession(sessionId: string, pendingKey: string) {
+  const keys = pendingKeysBySession.get(sessionId) || new Set<string>()
+  keys.add(pendingKey)
+  pendingKeysBySession.set(sessionId, keys)
+}
+
+function clearPendingKey(pendingKey: string) {
+  const pending = pendingInteractions.get(pendingKey)
+  if (!pending) return
+  clearTimeout(pending.timer)
+  pendingInteractions.delete(pendingKey)
+  const keys = pendingKeysBySession.get(pending.sessionId)
+  if (!keys) return
+  keys.delete(pendingKey)
+  if (keys.size === 0) {
+    pendingKeysBySession.delete(pending.sessionId)
+  }
+}
+
+function clearPendingForSession(sessionId: string) {
+  const keys = pendingKeysBySession.get(sessionId)
+  if (!keys) return
+  for (const key of [...keys]) {
+    clearPendingKey(key)
+  }
+}
+
+function resolveOpenCodeBaseUrl(ctx: PluginInput, config: Required<OpenClawBridgeConfig>): string {
+  const rawServerUrl = (ctx as { serverUrl?: URL | string }).serverUrl
+  if (rawServerUrl instanceof URL) {
+    return rawServerUrl.origin
+  }
+  if (typeof rawServerUrl === "string" && rawServerUrl.trim().length > 0) {
+    try {
+      return new URL(rawServerUrl).origin
+    } catch {
+      return config.opencodeBaseUrl
+    }
+  }
+  return config.opencodeBaseUrl
+}
+
+function extractSessionIdFromEvent(properties: Record<string, unknown> | undefined): string | undefined {
+  const info = properties?.info as Record<string, unknown> | undefined
+  return (
+    trimToUndefined(info?.id) ||
+    trimToUndefined(properties?.sessionID) ||
+    trimToUndefined(properties?.sessionId) ||
+    trimToUndefined((properties?.session as Record<string, unknown> | undefined)?.id)
+  )
+}
+
+function looksLikeChildSessionFallback(props: Record<string, unknown> | undefined, stateAgent?: string): boolean {
+  const titleCandidates = [
+    trimToUndefined((props?.info as Record<string, unknown> | undefined)?.title),
+    trimToUndefined(props?.title),
+  ].filter((value): value is string => Boolean(value))
+  const info = props?.info as Record<string, unknown> | undefined
+  const runtimeAgent = trimToUndefined(info?.agent) || trimToUndefined(props?.agent)
+  const text = `${titleCandidates.join(" ")} ${stateAgent || ""} ${runtimeAgent || ""}`.toLowerCase()
+  return text.includes("subagent") || text.includes("sisyphus-junior")
+}
+
+function validateAndCorrectRoute(sessionId: string | undefined, resolvedTarget: string | undefined): RouteDecision {
+  if (!sessionId) {
+    return { targetSession: resolvedTarget, routeCorrected: false }
+  }
+
+  const state = sessionStates.get(sessionId)
+  const remembered = trimToUndefined(state?.targetSession)
+  const current = trimToUndefined(resolvedTarget)
+  if (remembered && current && remembered !== current) {
+    return { targetSession: remembered, routeCorrected: true }
+  }
+  if (remembered && !current) {
+    return { targetSession: remembered, routeCorrected: false }
+  }
+  return { targetSession: current, routeCorrected: false }
+}
+
+function buildUserNotificationText(params:
+  | {
+      kind: "question"
+      workspace: string
+      sessionId: string
+      requestId?: string
+      questions: Array<{ title: string; options: string[] }>
+      timeoutMs: number
+      routeCorrected: boolean
+    }
+  | {
+      kind: "permission"
+      workspace: string
+      sessionId: string
+      requestId?: string
+      tool?: string
+      timeoutMs: number
+      routeCorrected: boolean
+    }
+): string {
+  const minutes = Math.max(1, Math.round(params.timeoutMs / 60000))
+  const header = params.kind === "question" ? "OpenCode 在等你回答问题" : "OpenCode 在请求权限确认"
+  const lines = [
+    header,
+    `项目: ${basename(params.workspace)}`,
+    `session: ${params.sessionId}`,
+  ]
+  if (params.requestId) {
+    lines.push(`request: ${params.requestId}`)
+  }
+  if (params.routeCorrected) {
+    lines.push("[ROUTE-CORRECTED] 已自动修正历史路由漂移")
+  }
+
+  if (params.kind === "question") {
+    if (params.questions.length === 0) {
+      lines.push("问题内容：未提供（请查看会话后直接回复）")
+    } else {
+      for (let i = 0; i < Math.min(params.questions.length, 3); i++) {
+        const q = params.questions[i]
+        lines.push(`Q${i + 1}: ${q.title}`)
+        if (q.options.length > 0) {
+          lines.push(`选项: ${q.options.map((o, idx) => `${idx + 1}.${o}`).join(" | ")}`)
+        }
+      }
+    }
+  } else {
+    lines.push(params.tool ? `工具: ${params.tool}` : "工具: 未提供")
+    lines.push("请回复 allow 或 deny")
+  }
+
+  lines.push(`请在 ${minutes} 分钟内回复；超时后将自动处理。`)
+  return lines.join("\n")
+}
+
+type ProcessResult = {
+  ok: boolean
+  stdout: string
+}
+
+async function runProcess(
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<ProcessResult> {
+  return await new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+
+    let stdout = ""
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL")
+      resolve({ ok: false, stdout })
+    }, timeoutMs)
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
+    child.on("error", () => {
+      clearTimeout(timer)
+      resolve({ ok: false, stdout })
+    })
+    child.on("exit", (code) => {
+      clearTimeout(timer)
+      resolve({ ok: code === 0, stdout })
+    })
+  })
+}
+
+function extractPortFromBaseUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl)
+    return url.port || (url.protocol === "https:" ? "443" : "80")
+  } catch {
+    return "4096"
+  }
+}
+
+async function captureSnapshotForSession(
+  config: Required<OpenClawBridgeConfig>,
+  sessionId: string,
+  baseUrl: string,
+): Promise<string | undefined> {
+  const sendScriptPath = trimToUndefined(config.sendScriptPath)
+  if (!sendScriptPath) return undefined
+
+  const scriptDir = dirname(sendScriptPath)
+  const snapshotScriptPath = join(scriptDir, "oc_snapshot.py")
+  if (!existsSync(snapshotScriptPath)) return undefined
+
+  const outputPath = `/tmp/openclaw-bridge-${sessionId}-${Date.now()}.png`
+  const snapshot = await runProcess(
+    "python3",
+    [snapshotScriptPath, sessionId, outputPath, extractPortFromBaseUrl(baseUrl)],
+    scriptDir,
+    90000,
+  )
+  if (!snapshot.ok) return undefined
+
+  const filesLine = snapshot.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("SNAPSHOT_FILES="))
+  if (!filesLine) return undefined
+  const first = filesLine.replace(/^SNAPSHOT_FILES=/, "").split("|")[0]
+  return existsSync(first) ? first : undefined
+}
+
+async function sendUserNotification(
+  config: Required<OpenClawBridgeConfig>,
+  text: string,
+  sessionId: string,
+  baseUrl: string,
+): Promise<boolean> {
+  const scriptPath = trimToUndefined(config.sendScriptPath)
+  if (!scriptPath) return false
+
+  const scriptDir = dirname(scriptPath)
+  const snapshotPath = await captureSnapshotForSession(config, sessionId, baseUrl)
+  let imageSent = false
+  if (snapshotPath) {
+    const image = await runProcess(
+      "python3",
+      [scriptPath, "--channel", "telegram", "image", snapshotPath, "OpenCode 等待你的处理"],
+      scriptDir,
+      30000,
+    )
+    imageSent = image.ok
+  }
+
+  const sent = await runProcess(
+    "python3",
+    [scriptPath, "--channel", "telegram", "text", text],
+    scriptDir,
+    30000,
+  )
+
+  return sent.ok
+}
+
+function buildQuestionAutoReplyWakeText(params: {
+  workspace: string
+  sessionId: string
+  requestId?: string
+  questions: Array<{ title: string; options: string[] }>
+  routeCorrected?: boolean
+}) {
+  const base = buildQuestionWakeText(params)
+  const prefix = [
+    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。",
+    params.routeCorrected ? "[ROUTE-CORRECTED] 已使用 session.created 时缓存路由。" : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n")
+  return `${prefix}\n${base}`
+}
+
+function buildPermissionAutoReplyWakeText(params: {
+  workspace: string
+  sessionId: string
+  requestId?: string
+  tool?: string
+  routeCorrected?: boolean
+}) {
+  const base = buildPermissionWakeText(params)
+  const prefix = [
+    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。",
+    params.routeCorrected ? "[ROUTE-CORRECTED] 已使用 session.created 时缓存路由。" : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n")
+  return `${prefix}\n${base}`
+}
 
 /**
  * 通过 OpenClaw Webhook API 唤醒 AI agent
@@ -339,15 +718,187 @@ export function createOpenClawBridge(
 ) {
   const c = resolveConfig(config)
   const workspace = resolveWorkspace(ctx)
+  const openCodeBaseUrl = resolveOpenCodeBaseUrl(ctx, c)
+
+  const isPendingStillOpen = async (pending: PendingInteraction): Promise<boolean> => {
+    try {
+      const path = pending.kind === "question" ? "/question" : "/permission"
+      const response = await fetch(`${openCodeBaseUrl}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(3000),
+      })
+      if (!response.ok) return false
+      const data = (await response.json()) as unknown
+      if (!Array.isArray(data)) return false
+      return data.some((item) => {
+        const row = item as Record<string, unknown>
+        const rowSessionId = trimToUndefined(row.sessionID) || trimToUndefined(row.sessionId)
+        const rowId = trimToUndefined(row.id)
+        if (rowSessionId !== pending.sessionId) return false
+        if (pending.requestId && rowId) return rowId === pending.requestId
+        return true
+      })
+    } catch {
+      return false
+    }
+  }
+
+  const startPendingTimer = (params: {
+    kind: PendingInteractionKind
+    sessionId: string
+    requestId?: string
+    targetSession?: string
+    routeCorrected: boolean
+    tool?: string
+    questions?: Array<{ title: string; options: string[] }>
+  }) => {
+    const pendingKey = buildPendingKey({
+      kind: params.kind,
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      tool: params.tool,
+      questions: params.questions,
+    })
+    if (pendingInteractions.has(pendingKey)) {
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      const pending = pendingInteractions.get(pendingKey)
+      if (!pending) return
+      const stillOpen = await isPendingStillOpen(pending)
+      if (!stillOpen) {
+        clearPendingKey(pendingKey)
+        return
+      }
+      if (!c.autoReplyEnabled) {
+        clearPendingKey(pendingKey)
+        return
+      }
+
+      const wakeText = pending.kind === "question"
+        ? buildQuestionAutoReplyWakeText({
+            workspace: pending.workspace,
+            sessionId: pending.sessionId,
+            requestId: pending.requestId,
+            questions: params.questions || [],
+            routeCorrected: params.routeCorrected,
+          })
+        : buildPermissionAutoReplyWakeText({
+            workspace: pending.workspace,
+            sessionId: pending.sessionId,
+            requestId: pending.requestId,
+            tool: params.tool,
+            routeCorrected: params.routeCorrected,
+          })
+
+      await wakeOpenClaw(c, wakeText, pending.targetSession)
+      clearPendingKey(pendingKey)
+    }, c.questionTimeoutMs)
+
+    pendingInteractions.set(pendingKey, {
+      key: pendingKey,
+      kind: params.kind,
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      workspace,
+      targetSession: params.targetSession,
+      createdAt: Date.now(),
+      timer,
+    })
+    registerPendingForSession(params.sessionId, pendingKey)
+  }
+
+  const handleInteractiveBlock = async (params:
+    | {
+        kind: "question"
+        sessionId: string
+        requestId?: string
+        route: RouteDecision
+        isChildSession: boolean
+        questions: Array<{ title: string; options: string[] }>
+        tool?: string
+      }
+    | {
+        kind: "permission"
+        sessionId: string
+        requestId?: string
+        route: RouteDecision
+        isChildSession: boolean
+        tool?: string
+      }
+  ) => {
+    if (params.isChildSession) return
+
+    const pendingKey = buildPendingKey({
+      kind: params.kind,
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      tool: params.tool,
+      questions: params.kind === "question" ? params.questions : undefined,
+    })
+    if (pendingInteractions.has(pendingKey)) {
+      return
+    }
+
+    const userText = params.kind === "question"
+      ? buildUserNotificationText({
+          kind: "question",
+          workspace,
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          questions: params.questions,
+          timeoutMs: c.questionTimeoutMs,
+          routeCorrected: params.route.routeCorrected,
+        })
+      : buildUserNotificationText({
+          kind: "permission",
+          workspace,
+          sessionId: params.sessionId,
+          requestId: params.requestId,
+          tool: params.tool,
+          timeoutMs: c.questionTimeoutMs,
+          routeCorrected: params.route.routeCorrected,
+        })
+
+    const notified = await sendUserNotification(c, userText, params.sessionId, openCodeBaseUrl)
+    if (!notified) {
+      const fallbackText = params.kind === "question"
+        ? buildQuestionWakeText({
+            workspace,
+            sessionId: params.sessionId,
+            requestId: params.requestId,
+            questions: params.questions,
+          })
+        : buildPermissionWakeText({
+            workspace,
+            sessionId: params.sessionId,
+            requestId: params.requestId,
+            tool: params.tool,
+          })
+      await wakeOpenClaw(c, fallbackText, params.route.targetSession)
+      return
+    }
+
+    startPendingTimer({
+      kind: params.kind,
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      targetSession: params.route.targetSession,
+      routeCorrected: params.route.routeCorrected,
+      tool: params.tool,
+      questions: params.kind === "question" ? params.questions : undefined,
+    })
+  }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.created") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionId = info?.id as string | undefined
+      const sessionId = extractSessionIdFromEvent(props)
       if (sessionId) {
-        const parentID = info?.parentID as string | undefined
+        const parentID = getParentIDFromProps(props)
         const targetSession = resolveTargetSession(c, workspace, sessionId)
         sessionStates.set(sessionId, {
           status: "created",
@@ -363,16 +914,53 @@ export function createOpenClawBridge(
           sessionId,
           title: info?.title || "",
           parentID: parentID || "",
+          debug_parent_fields: {
+            top_parentID: trimToUndefined(props?.parentID),
+            top_parentId: trimToUndefined(props?.parentId),
+            info_parentID: trimToUndefined(info?.parentID),
+            info_parentId: trimToUndefined(info?.parentId),
+            info_parent_obj_id: trimToUndefined((info?.parent as Record<string, unknown> | undefined)?.id),
+          },
+          debug_props: safeJson(props),
           workspace,
           targetSession,
         })
+        if (targetSession) {
+          persistSessionRoute(c, workspace, sessionId, targetSession)
+        }
       }
       return
     }
 
     const sessionId = getSessionID(props)
-    const stateTargetSession = sessionId ? sessionStates.get(sessionId)?.targetSession : undefined
-    const targetSession = stateTargetSession || resolveTargetSession(c, workspace, sessionId)
+    const routeDecision = validateAndCorrectRoute(
+      sessionId,
+      resolveTargetSession(c, workspace, sessionId)
+    )
+    const targetSession = routeDecision.targetSession
+    if (sessionId && targetSession && routeDecision.routeCorrected) {
+      const routePersisted = persistSessionRoute(c, workspace, sessionId, targetSession)
+      await writeNotification(c, "route.corrected", {
+        sessionId,
+        workspace,
+        targetSession,
+        routePersisted,
+      })
+    }
+
+    if (sessionId && !sessionStates.has(sessionId)) {
+      const info = props?.info as Record<string, unknown> | undefined
+      sessionStates.set(sessionId, {
+        status: "running",
+        title: trimToUndefined(info?.title) || "",
+        agent: trimToUndefined(info?.agent) || "",
+        workspace,
+        parentID: getParentIDFromProps(props),
+        targetSession,
+        lastActivity: Date.now(),
+        idleTimer: null,
+      })
+    }
 
     // 子 session（有 parentID）不触发 wakeOpenClaw，只写文件通知
     // 子 session 完成后主 session 会自动继续，无需打扰用户
@@ -382,30 +970,31 @@ export function createOpenClawBridge(
         if (state?.parentID) return true
       }
       // 也检查事件 properties 里的 parentID（兜底）
-      const info = props?.info as Record<string, unknown> | undefined
-      if (info?.parentID) return true
-      if (props?.parentID) return true
-      return false
+      if (getParentIDFromProps(props)) return true
+      return looksLikeChildSessionFallback(props, sessionId ? sessionStates.get(sessionId)?.agent : undefined)
     })()
 
     // Question（显式事件）
     if (QUESTION_EVENTS.has(event.type) && sessionId) {
       const requestId = getRequestID(props)
       const questions = parseQuestionItems(props)
-      const text = buildQuestionWakeText({ workspace, sessionId, requestId, questions })
-
       await writeNotification(c, "question.asked", {
         sessionId,
         workspace,
         requestId,
         targetSession,
+        routeCorrected: routeDecision.routeCorrected,
         isChild: isChildSession,
         questions,
       })
-      // 子 session 的 question 由主 agent 自行处理，不打扰用户
-      if (!isChildSession) {
-        await wakeOpenClaw(c, text, targetSession)
-      }
+      await handleInteractiveBlock({
+        kind: "question",
+        sessionId,
+        requestId,
+        route: routeDecision,
+        isChildSession,
+        questions,
+      })
       return
     }
 
@@ -413,43 +1002,63 @@ export function createOpenClawBridge(
     if (PERMISSION_EVENTS.has(event.type) && sessionId) {
       const requestId = getRequestID(props)
       const tool = getPermissionTool(props)
-      const text = buildPermissionWakeText({ workspace, sessionId, requestId, tool })
-
       await writeNotification(c, "permission.asked", {
         sessionId,
         workspace,
         requestId,
         tool,
         targetSession,
+        routeCorrected: routeDecision.routeCorrected,
         isChild: isChildSession,
       })
-      // 子 session 的 permission 由主 agent 自行处理
-      if (!isChildSession) {
-        await wakeOpenClaw(c, text, targetSession)
-      }
+      await handleInteractiveBlock({
+        kind: "permission",
+        sessionId,
+        requestId,
+        tool,
+        route: routeDecision,
+        isChildSession,
+      })
       return
     }
 
     // Question（通过工具调用触发）
     if (event.type === "tool.execute.before" && sessionId) {
       const toolName = (getPermissionTool(props) || "").toLowerCase()
+      const state = sessionStates.get(sessionId)
+      if (state) {
+        state.lastActivity = Date.now()
+        if (state.idleTimer) {
+          clearTimeout(state.idleTimer)
+          state.idleTimer = null
+        }
+      }
+      if (!QUESTION_TOOLS.has(toolName)) {
+        clearPendingForSession(sessionId)
+      }
+
       if (QUESTION_TOOLS.has(toolName)) {
         const requestId = getRequestID(props)
         const questions = parseQuestionItems(props)
-        const text = buildQuestionWakeText({ workspace, sessionId, requestId, questions })
-
         await writeNotification(c, "question.asked", {
           sessionId,
           workspace,
           requestId,
           targetSession,
+          routeCorrected: routeDecision.routeCorrected,
           isChild: isChildSession,
           tool: toolName,
           questions,
         })
-        if (!isChildSession) {
-          await wakeOpenClaw(c, text, targetSession)
-        }
+        await handleInteractiveBlock({
+          kind: "question",
+          sessionId,
+          requestId,
+          route: routeDecision,
+          isChildSession,
+          questions,
+          tool: toolName,
+        })
       }
       return
     }
@@ -459,6 +1068,7 @@ export function createOpenClawBridge(
 
       const state = sessionStates.get(sessionId)
       if (state?.idleTimer) clearTimeout(state.idleTimer)
+      clearPendingForSession(sessionId)
 
       // 子 session idle 不唤醒用户，只写文件记录
       if (isChildSession) {
@@ -511,6 +1121,7 @@ export function createOpenClawBridge(
         state.status = "error"
         if (state.idleTimer) clearTimeout(state.idleTimer)
       }
+      clearPendingForSession(sessionId)
 
       const error = typeof props?.error === "object" ? JSON.stringify(props.error) : String(props?.error || "unknown error")
       const stateWorkspace = state?.workspace || workspace
@@ -551,20 +1162,7 @@ export function createOpenClawBridge(
             state.idleTimer = null
           }
         }
-      }
-      return
-    }
-
-    if (event.type === "tool.execute.before") {
-      if (sessionId) {
-        const state = sessionStates.get(sessionId)
-        if (state) {
-          state.lastActivity = Date.now()
-          if (state.idleTimer) {
-            clearTimeout(state.idleTimer)
-            state.idleTimer = null
-          }
-        }
+        clearPendingForSession(messageSessionId)
       }
       return
     }
@@ -574,6 +1172,7 @@ export function createOpenClawBridge(
       if (info?.id) {
         const state = sessionStates.get(info.id)
         if (state?.idleTimer) clearTimeout(state.idleTimer)
+        clearPendingForSession(info.id)
         sessionStates.delete(info.id)
       }
       return
