@@ -290,7 +290,8 @@ function runSnapshotAndSend(params: {
   const shell = [
     `SNAP_OUT=$(bash \"${OC_PILOT_SH}\" snapshot ${params.sessionId} \"\" ${params.port})`,
     `FILES=$(echo \"$SNAP_OUT\" | tail -n 1)`,
-    `PNG=$(echo "$FILES" | awk -F'|' '{print $1}')`,
+    // oc_snapshot 可能返回多张图（flow + question）；优先取最后一张（通常是 question 卡片）
+    `PNG=$(echo "$FILES" | awk -F'|' '{print $NF}')`,
     `[ -n \"$PNG\" ]`,
     `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"$PNG\" \"${caption}\"`,
   ].join(" && ")
@@ -333,6 +334,12 @@ const PERMISSION_EVENTS = new Set([
 ])
 
 const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
+
+const BRIDGE_DEBUG = process.env.OPENCODE_BRIDGE_DEBUG === "1"
+function dbg(...args: Array<unknown>) {
+  if (!BRIDGE_DEBUG) return
+  console.log("[openclaw-bridge]", ...args)
+}
 
 type PendingInteractionKind = "question" | "permission"
 
@@ -721,8 +728,12 @@ export function createOpenClawBridge(
     requestId?: string
     questions: Array<{ title: string; options: string[] }>
   }) => {
+    dbg("maybeSendQuestionSnapshot.start", params)
     const ws = await fetchSessionDirectory(openCodeBaseUrl, params.sessionId)
-    if (!ws || ws === "/") return
+    if (!ws || ws === "/") {
+      dbg("maybeSendQuestionSnapshot.skip", { reason: "workspace-empty", ws })
+      return
+    }
     const port = detectOpenCodePort()
     const title = params.questions?.[0]?.title || params.requestId || params.sessionId
 
@@ -732,6 +743,7 @@ export function createOpenClawBridge(
       port,
       questionTitle: title,
     })
+    dbg("maybeSendQuestionSnapshot.result", { ok: res.ok, stdout: res.stdout?.slice(0, 200), stderr: res.stderr?.slice(0, 200) })
 
     await writeNotification(c, "question.snapshot", {
       sessionId: params.sessionId,
@@ -743,9 +755,22 @@ export function createOpenClawBridge(
     })
   }
 
-  const sendDirectWakeToSession = async (targetSession: string | undefined, text: string) => {
+  const sendDirectWakeToSession = async (
+    targetSession: string | undefined,
+    text: string,
+    options?: { interruptFirst?: boolean }
+  ) => {
     if (!targetSession) return false
-    return wakeOpenClaw(c, `/insert ${text}`, targetSession)
+    dbg("sendDirectWakeToSession", { targetSession, text: text.slice(0, 180), interruptFirst: options?.interruptFirst })
+
+    if (options?.interruptFirst) {
+      // 强制打断：先请求中止当前轮次，再插入提醒
+      await wakeOpenClaw(c, "/abort", targetSession)
+    }
+
+    const ok = await wakeOpenClaw(c, `/insert ${text}`, targetSession)
+    dbg("sendDirectWakeToSession.result", { ok })
+    return ok
   }
 
   const maybeNotifyBusyFallback = async (params: {
@@ -775,7 +800,9 @@ export function createOpenClawBridge(
       kind: params.kind,
       mode: "insert",
     })
-    await sendDirectWakeToSession(params.targetSession, lines.join(" "))
+    await sendDirectWakeToSession(params.targetSession, lines.join(" "), {
+      interruptFirst: params.kind === "question",
+    })
   }
 
   const startPendingTimer = (params: {
@@ -998,6 +1025,7 @@ export function createOpenClawBridge(
     if (QUESTION_EVENTS.has(event.type) && sessionId) {
       const requestId = getRequestID(props)
       const questions = parseQuestionItems(props)
+      dbg("event.question", { eventType: event.type, sessionId, requestId, questions: questions.length, targetSession })
       await writeNotification(c, "question.asked", {
         sessionId,
         workspace,
@@ -1073,6 +1101,7 @@ export function createOpenClawBridge(
       if (QUESTION_TOOLS.has(toolName)) {
         const requestId = getRequestID(props)
         const questions = parseQuestionItems(props)
+        dbg("event.tool.question", { sessionId, requestId, questions: questions.length, toolName, targetSession })
         await writeNotification(c, "question.asked", {
           sessionId,
           workspace,
