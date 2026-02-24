@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { readFileSync, existsSync, writeFileSync } from "fs"
 import { basename, join } from "path"
+import { spawn } from "child_process"
 
 /**
  * openclaw-bridge hook
@@ -49,6 +50,9 @@ const HARDCODED_DEFAULTS: Required<OpenClawBridgeConfig> = {
   opencodeBaseUrl: "http://127.0.0.1:4096",
   sessionRoutesFile: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications/session-routes.json",
 }
+
+const OC_PILOT_SH = "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc.sh"
+const OC_SEND_PY = "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_send.py"
 
 /** 从外部 config.json 加载配置，支持多个候选路径 */
 function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
@@ -239,6 +243,58 @@ function resolveWorkspace(ctx: PluginInput): string {
   )
 }
 
+async function fetchSessionDirectory(baseUrl: string, sessionId: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${baseUrl}/session/${sessionId}`, {
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!response.ok) return undefined
+    const data = (await response.json()) as Record<string, unknown>
+    return trimToUndefined(data?.directory)
+  } catch {
+    return undefined
+  }
+}
+
+function runCommand(shell: string): Promise<SnapshotResult> {
+  return new Promise((resolve) => {
+    const child = spawn("bash", ["-lc", shell], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk)
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk)
+    })
+
+    child.on("close", (code) => {
+      resolve({ ok: code === 0, stdout, stderr })
+    })
+
+    child.on("error", (err) => {
+      resolve({ ok: false, stderr: String(err) })
+    })
+  })
+}
+
+function runSnapshotAndSend(params: {
+  workspace: string
+  sessionId: string
+  port: string
+  questionTitle?: string
+}): Promise<SnapshotResult> {
+  const caption = `OpenCode Question: ${params.questionTitle || params.sessionId}`.replace(/"/g, "\\\"")
+  const shell = [
+    `SNAP_OUT=$(bash \"${OC_PILOT_SH}\" snapshot ${params.sessionId} \"\" ${params.port})`,
+    `PNG=$(echo \"$SNAP_OUT\" | tail -n 1)`,
+    `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"$PNG\" \"${caption}\"`,
+  ].join(" && ")
+  return runCommand(shell)
+}
+
 function getParentIDFromProps(properties: Record<string, unknown> | undefined): string | undefined {
   const info = properties?.info as Record<string, unknown> | undefined
   const infoParent = info?.parent as Record<string, unknown> | undefined
@@ -289,6 +345,13 @@ type PendingInteraction = {
   timer: ReturnType<typeof setTimeout>
 }
 
+type SnapshotResult = {
+  ok: boolean
+  path?: string
+  stdout?: string
+  stderr?: string
+}
+
 type RouteDecision = {
   targetSession?: string
   routeCorrected: boolean
@@ -308,6 +371,7 @@ const sessionStates = new Map<string, {
 
 const pendingInteractions = new Map<string, PendingInteraction>()
 const pendingKeysBySession = new Map<string, Set<string>>()
+const latestQuestionBySession = new Map<string, { requestId?: string; title: string; options: string[]; at: number }>()
 
 function buildPendingKey(params: {
   kind: PendingInteractionKind
@@ -557,7 +621,7 @@ async function writeNotification(
       JSON.stringify(notification, null, 2)
     )
 
-    if (["session.idle", "session.error", "question.asked", "permission.asked"].includes(eventType)) {
+    if (["session.idle", "session.error", "question.asked", "permission.asked", "question.snapshot", "delivery.text"].includes(eventType)) {
       const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)
       const sid = String(data.sessionId || "unknown").slice(0, 12)
       const filename = `${ts}_${eventType.replace(".", "_")}_${sid}.json`
@@ -639,6 +703,77 @@ export function createOpenClawBridge(
     } catch {
       return false
     }
+  }
+
+  const detectOpenCodePort = (): string => {
+    try {
+      const u = new URL(openCodeBaseUrl)
+      return u.port || "4096"
+    } catch {
+      return "4096"
+    }
+  }
+
+  const maybeSendQuestionSnapshot = async (params: {
+    sessionId: string
+    requestId?: string
+    questions: Array<{ title: string; options: string[] }>
+  }) => {
+    const ws = await fetchSessionDirectory(openCodeBaseUrl, params.sessionId)
+    if (!ws || ws === "/") return
+    const port = detectOpenCodePort()
+    const title = params.questions?.[0]?.title || params.requestId || params.sessionId
+
+    const res = await runSnapshotAndSend({
+      workspace: ws,
+      sessionId: params.sessionId,
+      port,
+      questionTitle: title,
+    })
+
+    await writeNotification(c, "question.snapshot", {
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      workspace: ws,
+      ok: res.ok,
+      stderr: res.stderr?.slice(0, 600),
+      stdout: res.stdout?.slice(0, 600),
+    })
+  }
+
+  const sendDirectWakeToSession = async (targetSession: string | undefined, text: string) => {
+    if (!targetSession) return false
+    return wakeOpenClaw(c, `/insert ${text}`, targetSession)
+  }
+
+  const maybeNotifyBusyFallback = async (params: {
+    kind: "question" | "error" | "done"
+    sessionId: string
+    requestId?: string
+    workspace: string
+    targetSession?: string
+    title?: string
+    error?: string
+  }) => {
+    // 直接向目标 session 插入一条 followup，降低 busy 时事件被忽略/延后感知的概率
+    const lines = [
+      `[OpenCode ${params.kind === "question" ? "Question" : params.kind === "error" ? "错误" : "任务完成"}]`,
+      `workspace=\"${params.workspace}\"`,
+      `session=${params.sessionId}`,
+      params.requestId ? `request=${params.requestId}` : undefined,
+      params.title ? `title=\"${params.title}\"` : undefined,
+      params.error ? `error=\"${params.error}\"` : undefined,
+    ].filter((x): x is string => Boolean(x))
+    await writeNotification(c, "delivery.text", {
+      sessionId: params.sessionId,
+      requestId: params.requestId,
+      targetSession: params.targetSession,
+      workspace: params.workspace,
+      routeSource: "bySession",
+      kind: params.kind,
+      mode: "insert",
+    })
+    await sendDirectWakeToSession(params.targetSession, lines.join(" "))
   }
 
   const startPendingTimer = (params: {
@@ -879,6 +1014,17 @@ export function createOpenClawBridge(
         isChildSession,
         questions,
       })
+      if (!isChildSession) {
+        await maybeNotifyBusyFallback({
+          kind: "question",
+          sessionId,
+          requestId,
+          workspace,
+          targetSession,
+          title: questions[0]?.title,
+        })
+        void maybeSendQuestionSnapshot({ sessionId, requestId, questions })
+      }
       return
     }
 
@@ -944,6 +1090,17 @@ export function createOpenClawBridge(
           questions,
           tool: toolName,
         })
+        if (!isChildSession) {
+          await maybeNotifyBusyFallback({
+            kind: "question",
+            sessionId,
+            requestId,
+            workspace,
+            targetSession,
+            title: questions[0]?.title,
+          })
+          void maybeSendQuestionSnapshot({ sessionId, requestId, questions })
+        }
       }
       return
     }
@@ -993,6 +1150,13 @@ export function createOpenClawBridge(
           `[OpenCode 任务完成] workspace="${stateWorkspace}" session=${sessionId} title="${title}" agent=${agent} — 请查看结果并通知用户。`,
           stateTarget
         )
+        await maybeNotifyBusyFallback({
+          kind: "done",
+          sessionId,
+          workspace: stateWorkspace,
+          targetSession: stateTarget,
+          title,
+        })
       }, c.idleConfirmationDelay)
 
       if (state) state.idleTimer = timer
@@ -1029,6 +1193,13 @@ export function createOpenClawBridge(
           `[OpenCode 错误] workspace="${stateWorkspace}" session=${sessionId} error="${error}" — 请检查并处理。`,
           stateTarget
         )
+        await maybeNotifyBusyFallback({
+          kind: "error",
+          sessionId,
+          workspace: stateWorkspace,
+          targetSession: stateTarget,
+          error,
+        })
       }
       return
     }
@@ -1039,6 +1210,18 @@ export function createOpenClawBridge(
       const agent = info?.agent as string | undefined
 
       if (messageSessionId) {
+        // message 流动说明 session 正在被处理，不要把 pending 提前清掉（否则 question 提醒可能被“吃掉”）
+        const hasPending = pendingKeysBySession.has(messageSessionId)
+        const parts = (props?.parts as Array<Record<string, unknown>> | undefined) || []
+        const hasQuestionToolPart = parts.some((part) => {
+          const t = trimToUndefined(part?.type)
+          const tool = trimToUndefined(part?.tool)
+          return t === "tool" && tool === "question"
+        })
+
+        if (!hasPending || hasQuestionToolPart) {
+          clearPendingForSession(messageSessionId)
+        }
         const state = sessionStates.get(messageSessionId)
         if (state) {
           state.lastActivity = Date.now()
