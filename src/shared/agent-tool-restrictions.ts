@@ -35,6 +35,11 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     task: false,
   },
 
+  athena: {
+    task: false,
+    call_omo_agent: false,
+  },
+
   "multimodal-looker": {
     read: true,
   },
