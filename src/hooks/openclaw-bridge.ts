@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { readFileSync, existsSync, writeFileSync } from "fs"
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
 import { basename, join } from "path"
 import { spawn } from "child_process"
 
@@ -280,22 +280,47 @@ function runCommand(shell: string): Promise<SnapshotResult> {
   })
 }
 
-function runSnapshotAndSend(params: {
+function runQuestionCardSend(params: {
   workspace: string
   sessionId: string
-  port: string
-  questionTitle?: string
+  requestId?: string
+  title: string
+  options: string[]
 }): Promise<SnapshotResult> {
-  const caption = `OpenCode Question: ${params.questionTitle || params.sessionId}`.replace(/"/g, "\\\"")
-  const shell = [
-    `SNAP_OUT=$(bash \"${OC_PILOT_SH}\" snapshot ${params.sessionId} \"\" ${params.port})`,
-    `FILES=$(echo \"$SNAP_OUT\" | tail -n 1)`,
-    // oc_snapshot 可能返回多张图（flow + question）；优先取最后一张（通常是 question 卡片）
-    `PNG=$(echo "$FILES" | awk -F'|' '{print $NF}')`,
-    `[ -n \"$PNG\" ]`,
-    `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"$PNG\" \"${caption}\"`,
-  ].join(" && ")
-  return runCommand(shell)
+  return new Promise((resolve) => {
+    const html = `<!doctype html><html><head><meta charset=\"utf-8\" />
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f8fb;margin:0;padding:24px;color:#0f172a}
+.card{background:#fff;border:1px solid #dbe7ff;border-radius:14px;padding:18px 20px;box-shadow:0 8px 26px rgba(15,23,42,.08)}
+.head{font-size:13px;font-weight:700;color:#1d4ed8;letter-spacing:.03em;margin-bottom:10px}
+.q{font-size:17px;font-weight:600;margin-bottom:14px;line-height:1.45}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;margin:7px 0}
+.badge{width:22px;height:22px;border-radius:6px;background:#e0edff;color:#1d4ed8;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 22px}
+.meta{margin-top:12px;color:#64748b;font-size:12px}
+</style></head><body>
+<div class=\"card\"><div class=\"head\">OpenCode Question</div>
+<div class=\"q\">${params.title}</div>
+${(params.options || []).map((o, i) => `<div class=\"opt\"><div class=\"badge\">${String.fromCharCode(65 + i)}</div><div>${o}</div></div>`).join("")}
+<div class=\"meta\">request=${params.requestId || "-"} · session=${params.sessionId}</div></div>
+</body></html>`
+
+    const safeId = (params.requestId || params.sessionId).replace(/[^A-Za-z0-9_-]+/g, "_")
+    const outDir = "/Volumes/外置硬盘/OpenClaw/main-workspace/opencode/snapshots"
+    const htmlPath = `${outDir}/question_card_${safeId}.html`
+    const pngPath = `${outDir}/question_card_${safeId}.png`
+
+    const writeCmd = `cat > \"${htmlPath}\" <<'HTML'\n${html}\nHTML`
+    const shotCmd = `node \"/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc_screenshot.js\" \"${htmlPath}\" \"${pngPath}\" 1200 900`
+    const caption = `OpenCode Question ${params.requestId || params.sessionId}`.replace(/"/g, "\\\"")
+    const sendCmd = `python3 \"${OC_SEND_PY}\" --workspace \"${params.workspace}\" --opencode-session \"${params.sessionId}\" image \"${pngPath}\" \"${caption}\"`
+    const cleanupCmd = `rm -f \"${htmlPath}\"`
+    const shell = `${writeCmd} && ${shotCmd} && ${sendCmd} && ${cleanupCmd}`
+
+    runCommand(shell).then((res) => {
+      try { unlinkSync(htmlPath) } catch {}
+      resolve(res)
+    })
+  })
 }
 
 function getParentIDFromProps(properties: Record<string, unknown> | undefined): string | undefined {
@@ -361,6 +386,14 @@ type SnapshotResult = {
   stderr?: string
 }
 
+type SessionQuestionCard = {
+  requestId?: string
+  sessionId: string
+  title: string
+  options: string[]
+  at: number
+}
+
 type RouteDecision = {
   targetSession?: string
   routeCorrected: boolean
@@ -380,7 +413,7 @@ const sessionStates = new Map<string, {
 
 const pendingInteractions = new Map<string, PendingInteraction>()
 const pendingKeysBySession = new Map<string, Set<string>>()
-const latestQuestionBySession = new Map<string, { requestId?: string; title: string; options: string[]; at: number }>()
+const latestQuestionBySession = new Map<string, SessionQuestionCard>()
 
 function buildPendingKey(params: {
   kind: PendingInteractionKind
@@ -723,51 +756,48 @@ export function createOpenClawBridge(
     }
   }
 
-  const maybeSendQuestionSnapshot = async (params: {
+  const sendQuestionCardSnapshot = async (params: {
     sessionId: string
     requestId?: string
     questions: Array<{ title: string; options: string[] }>
   }) => {
-    dbg("maybeSendQuestionSnapshot.start", params)
+    dbg("sendQuestionCardSnapshot.start", params)
     const ws = await fetchSessionDirectory(openCodeBaseUrl, params.sessionId)
     if (!ws || ws === "/") {
-      dbg("maybeSendQuestionSnapshot.skip", { reason: "workspace-empty", ws })
+      dbg("sendQuestionCardSnapshot.skip", { reason: "workspace-empty", ws })
       return
     }
-    const port = detectOpenCodePort()
-    const title = params.questions?.[0]?.title || params.requestId || params.sessionId
 
-    const res = await runSnapshotAndSend({
+    const first = params.questions?.[0]
+    if (!first) {
+      dbg("sendQuestionCardSnapshot.skip", { reason: "no-question-payload" })
+      return
+    }
+
+    // 仅 question 事件发送“问题卡片截图”（不走整页 snapshot，避免发出 JSON/普通聊天流页面）
+    const cardOut = await runQuestionCardSend({
       workspace: ws,
       sessionId: params.sessionId,
-      port,
-      questionTitle: title,
+      requestId: params.requestId,
+      title: first.title,
+      options: first.options,
     })
-    dbg("maybeSendQuestionSnapshot.result", { ok: res.ok, stdout: res.stdout?.slice(0, 200), stderr: res.stderr?.slice(0, 200) })
 
     await writeNotification(c, "question.snapshot", {
       sessionId: params.sessionId,
       requestId: params.requestId,
       workspace: ws,
-      ok: res.ok,
-      stderr: res.stderr?.slice(0, 600),
-      stdout: res.stdout?.slice(0, 600),
+      ok: cardOut.ok,
+      stderr: cardOut.stderr?.slice(0, 600),
+      stdout: cardOut.stdout?.slice(0, 600),
+      mode: "question-card-only",
     })
   }
 
-  const sendDirectWakeToSession = async (
-    targetSession: string | undefined,
-    text: string,
-    options?: { interruptFirst?: boolean }
-  ) => {
+  const sendDirectWakeToSession = async (targetSession: string | undefined, text: string) => {
     if (!targetSession) return false
-    dbg("sendDirectWakeToSession", { targetSession, text: text.slice(0, 180), interruptFirst: options?.interruptFirst })
-
-    if (options?.interruptFirst) {
-      // 强制打断：先请求中止当前轮次，再插入提醒
-      await wakeOpenClaw(c, "/abort", targetSession)
-    }
-
+    // /insert 语义：进入 followup/insert 队列，作为“下一条优先处理”，而非硬中断当前工具调用。
+    dbg("sendDirectWakeToSession", { targetSession, text: text.slice(0, 180) })
     const ok = await wakeOpenClaw(c, `/insert ${text}`, targetSession)
     dbg("sendDirectWakeToSession.result", { ok })
     return ok
@@ -800,9 +830,7 @@ export function createOpenClawBridge(
       kind: params.kind,
       mode: "insert",
     })
-    await sendDirectWakeToSession(params.targetSession, lines.join(" "), {
-      interruptFirst: params.kind === "question",
-    })
+    await sendDirectWakeToSession(params.targetSession, lines.join(" "))
   }
 
   const startPendingTimer = (params: {
@@ -1044,7 +1072,7 @@ export function createOpenClawBridge(
         isChildSession,
         questions,
       })
-      if (!isChildSession) {
+        if (!isChildSession) {
         await maybeNotifyBusyFallback({
           kind: "question",
           sessionId,
@@ -1053,7 +1081,7 @@ export function createOpenClawBridge(
           targetSession,
           title: questions[0]?.title,
         })
-        void maybeSendQuestionSnapshot({ sessionId, requestId, questions })
+        void sendQuestionCardSnapshot({ sessionId, requestId, questions })
       }
       return
     }
@@ -1130,7 +1158,7 @@ export function createOpenClawBridge(
             targetSession,
             title: questions[0]?.title,
           })
-          void maybeSendQuestionSnapshot({ sessionId, requestId, questions })
+          void sendQuestionCardSnapshot({ sessionId, requestId, questions })
         }
       }
       return
