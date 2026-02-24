@@ -478,8 +478,8 @@ function buildQuestionAutoReplyWakeText(params: {
 }) {
   const base = buildQuestionWakeText(params)
   const prefix = [
-    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。",
-    params.routeCorrected ? "[ROUTE-CORRECTED] 已使用 session.created 时缓存路由。" : undefined,
+    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。若之后用户晚到回复，请提示：该 request 可能已超时自动处理，不要重复 question reply。",
+    params.routeCorrected ? "[ROUTE-CORRECTED] 已自动修正路由漂移（使用 routes 文件当前值）。" : undefined,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n")
@@ -495,8 +495,8 @@ function buildPermissionAutoReplyWakeText(params: {
 }) {
   const base = buildPermissionWakeText(params)
   const prefix = [
-    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。",
-    params.routeCorrected ? "[ROUTE-CORRECTED] 已使用 session.created 时缓存路由。" : undefined,
+    "[AUTO-REPLY] 用户在 3 分钟内未回复，请自动代答。若之后用户晚到回复，请先确认 permission 是否仍 pending，再决定是否回复。",
+    params.routeCorrected ? "[ROUTE-CORRECTED] 已自动修正路由漂移（使用 routes 文件当前值）。" : undefined,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n")
@@ -867,6 +867,7 @@ export function createOpenClawBridge(
         requestId,
         targetSession,
         routeCorrected: routeDecision.routeCorrected,
+        routeSource: "bySession",
         isChild: isChildSession,
         questions,
       })
@@ -892,6 +893,7 @@ export function createOpenClawBridge(
         tool,
         targetSession,
         routeCorrected: routeDecision.routeCorrected,
+        routeSource: "bySession",
         isChild: isChildSession,
       })
       await handleInteractiveBlock({
@@ -983,6 +985,7 @@ export function createOpenClawBridge(
           agent,
           workspace: stateWorkspace,
           targetSession: stateTarget,
+          routeSource: "bySession",
         })
 
         await wakeOpenClaw(
@@ -1015,6 +1018,7 @@ export function createOpenClawBridge(
         error,
         workspace: stateWorkspace,
         targetSession: stateTarget,
+        routeSource: "bySession",
         isChild: isChildSession,
       })
 
