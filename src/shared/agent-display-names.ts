@@ -53,7 +53,13 @@ export function getAgentDisplayName(configKey: string): string {
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
-  
+
+  // Fall back to prefix before parenthesis, e.g. "Hephaestus (Deep Agent)" -> "hephaestus"
+  const prefix = lowerKey.split("(")[0]?.trim()
+  if (prefix && AGENT_DISPLAY_NAMES[prefix] !== undefined) {
+    return AGENT_DISPLAY_NAMES[prefix]
+  }
+
   // Unknown agent: return original key
   return configKey
 }
@@ -87,5 +93,11 @@ export function getAgentConfigKey(agentName: string): string {
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
+
+  const prefix = lower.split("(")[0]?.trim()
+  if (prefix && AGENT_DISPLAY_NAMES[prefix] !== undefined) {
+    return prefix
+  }
+
   return lower
 }

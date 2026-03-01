@@ -9,8 +9,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Sisyphus (Ultraworker)"
-    expect(result).toBe("Sisyphus (Ultraworker)")
+    // then returns Chinese display name used by current fork
+    expect(result).toBe("Sisyphus (主编排器，负责任务协调和委派)")
   })
 
   it("returns display name for uppercase config key (old format - case-insensitive)", () => {
@@ -20,8 +20,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Sisyphus (Ultraworker)" (case-insensitive lookup)
-    expect(result).toBe("Sisyphus (Ultraworker)")
+    // then returns Chinese display name (case-insensitive lookup)
+    expect(result).toBe("Sisyphus (主编排器，负责任务协调和委派)")
   })
 
   it("returns original key for unknown agents (fallback)", () => {
@@ -42,8 +42,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-     // then returns "Atlas (Plan Executor)"
-    expect(result).toBe("Atlas (Plan Executor)")
+     // then returns current Atlas display name
+    expect(result).toBe("Atlas (主编排器，通过task()完成todo列表中的所有任务)")
   })
 
   it("returns display name for prometheus", () => {
@@ -53,8 +53,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Prometheus (Plan Builder)"
-    expect(result).toBe("Prometheus (Plan Builder)")
+    // then returns current Prometheus display name
+    expect(result).toBe("Prometheus (规划智能体，负责生成工作计划)")
   })
 
   it("returns display name for sisyphus-junior", () => {
@@ -64,8 +64,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Sisyphus-Junior"
-    expect(result).toBe("Sisyphus-Junior")
+    // then returns current Sisyphus-Junior display name
+    expect(result).toBe("Sisyphus-Junior (聚焦任务执行器，执行委派任务)")
   })
 
   it("returns display name for metis", () => {
@@ -75,8 +75,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Metis (Plan Consultant)"
-    expect(result).toBe("Metis (Plan Consultant)")
+    // then returns current Metis display name
+    expect(result).toBe("Metis (预规划分析智能体，在规划前分析用户请求)")
   })
 
   it("returns display name for momus", () => {
@@ -86,8 +86,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-     // then returns "Momus (Plan Critic)"
-    expect(result).toBe("Momus (Plan Critic)")
+     // then returns current Momus display name
+    expect(result).toBe("Momus (计划审查智能体，验证计划可执行性)")
   })
 
   it("returns display name for oracle", () => {
@@ -97,8 +97,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "oracle"
-    expect(result).toBe("oracle")
+    // then returns current Oracle display name
+    expect(result).toBe("Oracle (只读咨询智能体，高智商推理专家)")
   })
 
   it("returns display name for librarian", () => {
@@ -108,8 +108,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "librarian"
-    expect(result).toBe("librarian")
+    // then returns current Librarian display name
+    expect(result).toBe("Librarian (多仓库研究智能体，搜索远程代码库和文档)")
   })
 
   it("returns display name for explore", () => {
@@ -119,8 +119,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "explore"
-    expect(result).toBe("explore")
+    // then returns current Explore display name
+    expect(result).toBe("Explore (快速代码库搜索智能体)")
   })
 
   it("returns display name for multimodal-looker", () => {
@@ -130,8 +130,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "multimodal-looker"
-    expect(result).toBe("multimodal-looker")
+    // then returns current Multimodal-Looker display name
+    expect(result).toBe("Multimodal-Looker (媒体分析智能体，解析PDF、图片和图表)")
   })
 
   it("returns display name for browser-tester", () => {
@@ -155,21 +155,32 @@ describe("getAgentDisplayName", () => {
     // then returns Athena display name
     expect(result).toBe("Athena (业务分析智能体，需求梳理与验收定义)")
   })
+
+  it("normalizes legacy display-like name by prefix", () => {
+    // given a legacy display-like name not present in reverse map
+    const configKey = "Hephaestus (Deep Agent)"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then resolves by known prefix
+    expect(result).toBe("Hephaestus (自主深度工作者，目标导向的端到端任务执行)")
+  })
 })
 
 describe("getAgentConfigKey", () => {
   it("resolves display name to config key", () => {
-    // given display name "Sisyphus (Ultraworker)"
+    // given current display name
     // when getAgentConfigKey called
     // then returns "sisyphus"
-    expect(getAgentConfigKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+    expect(getAgentConfigKey("Sisyphus (主编排器，负责任务协调和委派)")).toBe("sisyphus")
   })
 
   it("resolves display name case-insensitively", () => {
     // given display name in different case
     // when getAgentConfigKey called
     // then returns "atlas"
-    expect(getAgentConfigKey("atlas (plan executor)")).toBe("atlas")
+    expect(getAgentConfigKey("atlas (主编排器，通过task()完成todo列表中的所有任务)")).toBe("atlas")
   })
 
   it("passes through lowercase config keys unchanged", () => {
@@ -189,14 +200,20 @@ describe("getAgentConfigKey", () => {
   it("resolves all core agent display names", () => {
     // given all core display names
     // when/then each resolves to its config key
-    expect(getAgentConfigKey("Hephaestus (Deep Agent)")).toBe("hephaestus")
-    expect(getAgentConfigKey("Prometheus (Plan Builder)")).toBe("prometheus")
-    expect(getAgentConfigKey("Atlas (Plan Executor)")).toBe("atlas")
-    expect(getAgentConfigKey("Metis (Plan Consultant)")).toBe("metis")
-    expect(getAgentConfigKey("Momus (Plan Critic)")).toBe("momus")
-    expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
+    expect(getAgentConfigKey("Hephaestus (自主深度工作者，目标导向的端到端任务执行)")).toBe("hephaestus")
+    expect(getAgentConfigKey("Prometheus (规划智能体，负责生成工作计划)")).toBe("prometheus")
+    expect(getAgentConfigKey("Atlas (主编排器，通过task()完成todo列表中的所有任务)")).toBe("atlas")
+    expect(getAgentConfigKey("Metis (预规划分析智能体，在规划前分析用户请求)")).toBe("metis")
+    expect(getAgentConfigKey("Momus (计划审查智能体，验证计划可执行性)")).toBe("momus")
+    expect(getAgentConfigKey("Sisyphus-Junior (聚焦任务执行器，执行委派任务)")).toBe("sisyphus-junior")
     expect(getAgentConfigKey("Athena (业务分析智能体，需求梳理与验收定义)")).toBe("athena")
     expect(getAgentConfigKey("Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)")).toBe("browser-tester")
+  })
+
+  it("resolves legacy display-like names by prefix", () => {
+    // given / when / then
+    expect(getAgentConfigKey("Hephaestus (Deep Agent)")).toBe("hephaestus")
+    expect(getAgentConfigKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
   })
 })
 
@@ -204,19 +221,19 @@ describe("AGENT_DISPLAY_NAMES", () => {
   it("contains all expected agent mappings", () => {
     // given expected mappings
     const expectedMappings = {
-      sisyphus: "Sisyphus (Ultraworker)",
-      hephaestus: "Hephaestus (Deep Agent)",
-      prometheus: "Prometheus (Plan Builder)",
-      atlas: "Atlas (Plan Executor)",
-      "sisyphus-junior": "Sisyphus-Junior",
-      metis: "Metis (Plan Consultant)",
-      momus: "Momus (Plan Critic)",
-      oracle: "oracle",
-      librarian: "librarian",
-      explore: "explore",
+      sisyphus: "Sisyphus (主编排器，负责任务协调和委派)",
+      hephaestus: "Hephaestus (自主深度工作者，目标导向的端到端任务执行)",
+      prometheus: "Prometheus (规划智能体，负责生成工作计划)",
+      atlas: "Atlas (主编排器，通过task()完成todo列表中的所有任务)",
+      "sisyphus-junior": "Sisyphus-Junior (聚焦任务执行器，执行委派任务)",
+      metis: "Metis (预规划分析智能体，在规划前分析用户请求)",
+      momus: "Momus (计划审查智能体，验证计划可执行性)",
+      oracle: "Oracle (只读咨询智能体，高智商推理专家)",
+      librarian: "Librarian (多仓库研究智能体，搜索远程代码库和文档)",
+      explore: "Explore (快速代码库搜索智能体)",
       athena: "Athena (业务分析智能体，需求梳理与验收定义)",
       "browser-tester": "Browser-Tester (浏览器回归测试智能体，Chrome DevTools集成)",
-      "multimodal-looker": "multimodal-looker",
+      "multimodal-looker": "Multimodal-Looker (媒体分析智能体，解析PDF、图片和图表)",
     }
 
     // when checking the constant

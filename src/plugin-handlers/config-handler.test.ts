@@ -537,6 +537,30 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     // then
     expect(config.default_agent).toBe("  HePhAeStUs  ")
   })
+
+  test("resolves stale legacy display-name default_agent to current display name", async () => {
+    // given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      default_agent: "Hephaestus (Deep Agent)",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+  })
 })
 
 describe("Prometheus category config resolution", () => {
@@ -1302,7 +1326,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(true)
+    expect(lastCall?.[11]).toBe(true)
   })
 
   test("passes disable_omo_env=false to createBuiltinAgents when omitted", async () => {
@@ -1336,6 +1360,6 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(false)
+    expect(lastCall?.[11]).toBe(false)
   })
 })
