@@ -12,7 +12,8 @@ import { spawn } from "child_process"
  * - session.idle（完成）
  * - session.error（失败）
  *
- * 路由策略：优先按 session/workspace 解析目标 OpenClaw session，找不到再回退默认。
+ * 路由策略：优先按 session/workspace 解析目标 OpenClaw session。
+ * 默认开启严格模式（无显式路由则不派发 wake）。
  */
 
 interface OpenClawBridgeConfig {
@@ -24,6 +25,8 @@ interface OpenClawBridgeConfig {
   autoReplyEnabled?: boolean
   opencodeBaseUrl?: string
   sessionRoutesFile?: string
+  allowEnvSessionFallback?: boolean
+  requireExplicitRoute?: boolean
 }
 
 type DeliveryRoute = {
@@ -49,6 +52,8 @@ const HARDCODED_DEFAULTS: Required<OpenClawBridgeConfig> = {
   autoReplyEnabled: true,
   opencodeBaseUrl: "http://127.0.0.1:4096",
   sessionRoutesFile: "/Volumes/外置硬盘/OpenClaw/workspace/opencode/notifications/session-routes.json",
+  allowEnvSessionFallback: false,
+  requireExplicitRoute: true,
 }
 
 const OC_PILOT_SH = "/Volumes/外置硬盘/OpenClaw/main-workspace/skills/opencode-pilot/scripts/oc.sh"
@@ -80,6 +85,12 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (typeof gw.auto_reply_enabled === "boolean") result.autoReplyEnabled = gw.auto_reply_enabled
         if (gw.opencode_base_url) result.opencodeBaseUrl = gw.opencode_base_url
         if (gw.session_routes_file) result.sessionRoutesFile = gw.session_routes_file
+        if (typeof gw.allow_env_session_fallback === "boolean") {
+          result.allowEnvSessionFallback = gw.allow_env_session_fallback
+        }
+        if (typeof gw.require_explicit_route === "boolean") {
+          result.requireExplicitRoute = gw.require_explicit_route
+        }
         if (notif.output_dir) result.notificationsDir = notif.output_dir
         if (raw.opencode?.base_port) result.opencodeBaseUrl = `http://127.0.0.1:${raw.opencode.base_port}`
         // 也支持直接平铺格式（openclaw-bridge.config.json）
@@ -91,6 +102,12 @@ function loadExternalConfig(): Partial<OpenClawBridgeConfig> {
         if (typeof raw.autoReplyEnabled === "boolean") result.autoReplyEnabled = raw.autoReplyEnabled
         if (raw.opencodeBaseUrl) result.opencodeBaseUrl = raw.opencodeBaseUrl
         if (raw.sessionRoutesFile) result.sessionRoutesFile = raw.sessionRoutesFile
+        if (typeof raw.allowEnvSessionFallback === "boolean") {
+          result.allowEnvSessionFallback = raw.allowEnvSessionFallback
+        }
+        if (typeof raw.requireExplicitRoute === "boolean") {
+          result.requireExplicitRoute = raw.requireExplicitRoute
+        }
         return result
       } catch (_) {
         // 解析失败跳过
@@ -205,7 +222,6 @@ function persistSessionRoute(
 }
 
 function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace: string, sessionId?: string): string | undefined {
-  // 1) 文件路由（v2 仅支持 workspace::sid；兼容读取旧 sid 裸键）
   const routes = readSessionRoutes(config.sessionRoutesFile)
   const bySession = routes.bySession || {}
 
@@ -213,15 +229,12 @@ function resolveTargetSession(config: Required<OpenClawBridgeConfig>, workspace:
     const compositeKey = `${workspace}::${sessionId}`
     const exact = trimToUndefined(bySession[compositeKey])
     if (exact) return exact
-
-    // legacy fallback（仅读，不再写）
-    const plain = trimToUndefined(bySession[sessionId])
-    if (plain) return plain
   }
 
-  // 2) 环境变量最终兜底
-  const envSession = trimToUndefined(process.env.OPENCLAW_TARGET_SESSION) || trimToUndefined(process.env.OPENCLAW_SESSION_KEY)
-  if (envSession) return envSession
+  if (config.allowEnvSessionFallback) {
+    const envSession = trimToUndefined(process.env.OPENCLAW_TARGET_SESSION) || trimToUndefined(process.env.OPENCLAW_SESSION_KEY)
+    if (envSession) return envSession
+  }
 
   return undefined
 }
@@ -232,7 +245,7 @@ function resolveRouteFromFileOnly(config: Required<OpenClawBridgeConfig>, worksp
   const routes = readSessionRoutes(config.sessionRoutesFile)
   const bySession = routes.bySession || {}
   const compositeKey = `${workspace}::${sessionId}`
-  return trimToUndefined(bySession[compositeKey]) || trimToUndefined(bySession[sessionId])
+  return trimToUndefined(bySession[compositeKey])
 }
 
 function resolveWorkspace(ctx: PluginInput): string {
@@ -520,11 +533,6 @@ function validateAndCorrectRoute(sessionId: string | undefined, resolvedTarget: 
     return { targetSession: current, routeCorrected: true }
   }
 
-  // 若 routes 暂时不可用（例如文件瞬时读失败），才回退 remembered。
-  if (remembered && !current) {
-    return { targetSession: remembered, routeCorrected: false }
-  }
-
   return { targetSession: current, routeCorrected: false }
 }
 
@@ -626,6 +634,11 @@ async function wakeOpenClaw(
   text: string,
   targetSession?: string
 ): Promise<boolean> {
+  if (config.requireExplicitRoute && !targetSession) {
+    dbg("wakeOpenClaw.skipped.unbound", { preview: text.slice(0, 160) })
+    return false
+  }
+
   try {
     const url = `${config.gatewayUrl}/hooks/wake`
     const payload: { text: string; mode: string; session?: string } = { text, mode: "now" }
@@ -805,8 +818,6 @@ export function createOpenClawBridge(
   }
 
   const sendDirectWakeToSession = async (targetSession: string | undefined, text: string) => {
-    if (!targetSession) return false
-    // /insert 语义：进入 followup/insert 队列，作为“下一条优先处理”，而非硬中断当前工具调用。
     dbg("sendDirectWakeToSession", { targetSession, text: text.slice(0, 180) })
     const ok = await wakeOpenClaw(c, `/insert ${text}`, targetSession)
     dbg("sendDirectWakeToSession.result", { ok })
@@ -814,7 +825,7 @@ export function createOpenClawBridge(
   }
 
   const maybeNotifyBusyFallback = async (params: {
-    kind: "question" | "error" | "done"
+    kind: "error" | "done"
     sessionId: string
     requestId?: string
     workspace: string
@@ -824,7 +835,7 @@ export function createOpenClawBridge(
   }) => {
     // 直接向目标 session 插入一条 followup，降低 busy 时事件被忽略/延后感知的概率
     const lines = [
-      `[OpenCode ${params.kind === "question" ? "Question" : params.kind === "error" ? "错误" : "任务完成"}]`,
+      `[OpenCode ${params.kind === "error" ? "错误" : "任务完成"}]`,
       `workspace=\"${params.workspace}\"`,
       `session=${params.sessionId}`,
       params.requestId ? `request=${params.requestId}` : undefined,
@@ -892,7 +903,7 @@ export function createOpenClawBridge(
             routeCorrected: params.routeCorrected,
           })
 
-      await wakeOpenClaw(c, wakeText, pending.targetSession)
+      await sendDirectWakeToSession(pending.targetSession, wakeText)
       clearPendingKey(pendingKey)
     }, c.questionTimeoutMs)
 
@@ -928,7 +939,7 @@ export function createOpenClawBridge(
         tool?: string
       }
   ) => {
-    if (params.isChildSession) return
+    if (params.isChildSession) return false
 
     const pendingKey = buildPendingKey({
       kind: params.kind,
@@ -938,7 +949,7 @@ export function createOpenClawBridge(
       questions: params.kind === "question" ? params.questions : undefined,
     })
     if (pendingInteractions.has(pendingKey)) {
-      return
+      return false
     }
 
     // 不在 bridge 里直接调用 oc_send.py 发平台消息（会绑死 bot/chat）。
@@ -959,7 +970,7 @@ export function createOpenClawBridge(
 
     // question/permission 这种关键事件，发送前强制再读一次 routes 文件，避免使用陈旧内存态 target
     const freshTarget = resolveRouteFromFileOnly(c, workspace, params.sessionId) || params.route.targetSession
-    await wakeOpenClaw(c, wakeText, freshTarget)
+    await sendDirectWakeToSession(freshTarget, wakeText)
 
     startPendingTimer({
       kind: params.kind,
@@ -970,6 +981,8 @@ export function createOpenClawBridge(
       tool: params.tool,
       questions: params.kind === "question" ? params.questions : undefined,
     })
+
+    return true
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -1074,7 +1087,7 @@ export function createOpenClawBridge(
         isChild: isChildSession,
         questions,
       })
-      await handleInteractiveBlock({
+      const dispatched = await handleInteractiveBlock({
         kind: "question",
         sessionId,
         requestId,
@@ -1082,15 +1095,7 @@ export function createOpenClawBridge(
         isChildSession,
         questions,
       })
-        if (!isChildSession) {
-        await maybeNotifyBusyFallback({
-          kind: "question",
-          sessionId,
-          requestId,
-          workspace,
-          targetSession,
-          title: questions[0]?.title,
-        })
+        if (!isChildSession && dispatched) {
         void sendQuestionCardSnapshot({ sessionId, requestId, questions, kind: "question" })
       }
       return
@@ -1110,7 +1115,7 @@ export function createOpenClawBridge(
         routeSource: "bySession",
         isChild: isChildSession,
       })
-      await handleInteractiveBlock({
+      const dispatched = await handleInteractiveBlock({
         kind: "permission",
         sessionId,
         requestId,
@@ -1118,15 +1123,7 @@ export function createOpenClawBridge(
         route: routeDecision,
         isChildSession,
       })
-      if (!isChildSession) {
-        await maybeNotifyBusyFallback({
-          kind: "question",
-          sessionId,
-          requestId,
-          workspace,
-          targetSession,
-          title: tool ? `权限确认：${tool}` : "权限确认",
-        })
+      if (!isChildSession && dispatched) {
         void sendQuestionCardSnapshot({
           sessionId,
           requestId,
@@ -1166,7 +1163,7 @@ export function createOpenClawBridge(
           tool: toolName,
           questions,
         })
-        await handleInteractiveBlock({
+        const dispatched = await handleInteractiveBlock({
           kind: "question",
           sessionId,
           requestId,
@@ -1175,15 +1172,7 @@ export function createOpenClawBridge(
           questions,
           tool: toolName,
         })
-        if (!isChildSession) {
-          await maybeNotifyBusyFallback({
-            kind: "question",
-            sessionId,
-            requestId,
-            workspace,
-            targetSession,
-            title: questions[0]?.title,
-          })
+        if (!isChildSession && dispatched) {
           void sendQuestionCardSnapshot({ sessionId, requestId, questions, kind: "question" })
         }
       }
@@ -1230,11 +1219,6 @@ export function createOpenClawBridge(
           routeSource: "bySession",
         })
 
-        await wakeOpenClaw(
-          c,
-          `[OpenCode 任务完成] workspace="${stateWorkspace}" session=${sessionId} title="${title}" agent=${agent} — 请查看结果并通知用户。`,
-          stateTarget
-        )
         await maybeNotifyBusyFallback({
           kind: "done",
           sessionId,
@@ -1273,11 +1257,6 @@ export function createOpenClawBridge(
 
       // 子 session error 不打扰用户，主 agent 会处理
       if (!isChildSession) {
-        await wakeOpenClaw(
-          c,
-          `[OpenCode 错误] workspace="${stateWorkspace}" session=${sessionId} error="${error}" — 请检查并处理。`,
-          stateTarget
-        )
         await maybeNotifyBusyFallback({
           kind: "error",
           sessionId,
