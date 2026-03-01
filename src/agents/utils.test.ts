@@ -69,7 +69,6 @@ describe("createBuiltinAgents with model overrides", () => {
         undefined,
         [],
         undefined,
-        undefined,
         uiSelectedModel
       )
 
@@ -102,7 +101,6 @@ describe("createBuiltinAgents with model overrides", () => {
         undefined,
         [],
         undefined,
-        undefined,
         uiSelectedModel
       )
 
@@ -134,7 +132,6 @@ describe("createBuiltinAgents with model overrides", () => {
         undefined,
         undefined,
         [],
-        undefined,
         undefined,
         uiSelectedModel
       )
@@ -244,7 +241,7 @@ describe("createBuiltinAgents with model overrides", () => {
     const disabledSkills = new Set(["playwright"])
 
     // #when
-    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, undefined, disabledSkills)
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, disabledSkills)
 
     // #then
     expect(agents.sisyphus.prompt).not.toContain("playwright")
@@ -260,8 +257,44 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.athena).toBeDefined()
-    expect(agents.athena.mode).toBe("subagent")
+    expect(agents.athena.mode).toBe("all")
     expect(agents.athena.prompt).toContain("Athena")
+  })
+
+  test("Athena resolves model from connected provider fallback when system default is missing", async () => {
+    // #given - connected providers exist but systemDefaultModel is undefined
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+      // #then
+      expect(agents.athena).toBeDefined()
+      expect(agents.athena.model).toBe("anthropic/claude-opus-4-6")
+    } finally {
+      cacheSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("browser-tester resolves model from connected provider fallback when system default is missing", async () => {
+    // #given - connected providers exist but systemDefaultModel is undefined
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, undefined)
+
+      // #then
+      expect(agents["browser-tester"]).toBeDefined()
+      expect(agents["browser-tester"].model).toBe("openai/gpt-5.3-codex")
+    } finally {
+      cacheSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
   })
 
   test("includes custom agents in orchestrator prompts when provided via config", async () => {
@@ -700,7 +733,6 @@ describe("Hephaestus environment context toggle", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       disableFlag
     )
   }
@@ -755,7 +787,6 @@ describe("Sisyphus and Librarian environment context toggle", () => {
       undefined,
       undefined,
       [],
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -818,7 +849,6 @@ describe("Atlas is unaffected by environment context toggle", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       false
     )
 
@@ -830,7 +860,6 @@ describe("Atlas is unaffected by environment context toggle", () => {
       undefined,
       undefined,
       [],
-      undefined,
       undefined,
       undefined,
       undefined,

@@ -110,4 +110,19 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBeUndefined()
     expect(result.agentToUse).toBe("athena")
   })
+
+  test("normalizes @browser-tester and resolves browser tester agent", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "@browser-tester" })
+    const executorCtx = createExecutorContext(async () => [
+      { name: "browser-tester", mode: "subagent", model: { providerID: "google", modelID: "gemini-3-pro" } },
+    ])
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("browser-tester")
+  })
 })

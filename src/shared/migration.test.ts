@@ -178,6 +178,28 @@ describe("migrateAgentNames", () => {
     expect(migrated["Momus (Plan Reviewer)"]).toBeUndefined()
   })
 
+  test("migrates Athena variants to lowercase", () => {
+    // given agents config with "Athena" key
+    // when migrateAgentNames called
+    // then key becomes "athena"
+    const agents = { "Athena": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["athena"]).toEqual({ model: "test" })
+    expect(migrated["Athena"]).toBeUndefined()
+  })
+
+  test("migrates Browser-Tester variants to lowercase", () => {
+    // given agents config with "Browser-Tester" key
+    // when migrateAgentNames called
+    // then key becomes "browser-tester"
+    const agents = { "Browser-Tester": { model: "test" } }
+    const { migrated, changed } = migrateAgentNames(agents)
+    expect(changed).toBe(true)
+    expect(migrated["browser-tester"]).toEqual({ model: "test" })
+    expect(migrated["Browser-Tester"]).toBeUndefined()
+  })
+
   test("migrates Sisyphus-Junior to lowercase", () => {
     // given agents config with "Sisyphus-Junior" key
     // when migrateAgentNames called
