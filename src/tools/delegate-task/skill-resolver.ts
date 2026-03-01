@@ -29,9 +29,9 @@ export async function resolveSkillContent(
     directory?: string
     targetAgent?: string
   }
-): Promise<{ content: string | undefined; error: string | null }> {
+): Promise<{ content: string | undefined; contents: string[]; error: string | null }> {
   if (skills.length === 0) {
-    return { content: undefined, error: null }
+    return { content: undefined, contents: [], error: null }
   }
 
   const includeClaudeCodePaths = options.includeClaudeCodePaths ?? true
@@ -82,8 +82,13 @@ export async function resolveSkillContent(
       issues.push(`Skills restricted to other agents: ${restricted.join(", ")}`)
     }
 
-    return { content: undefined, error: `${issues.join(". ")}. Available: ${available || "none"}` }
+    return {
+      content: undefined,
+      contents: [],
+      error: `${issues.join(". ")}. Available: ${available || "none"}`,
+    }
   }
 
-  return { content: Array.from(resolved.values()).join("\n\n"), error: null }
+  const contents = Array.from(resolved.values())
+  return { content: contents.join("\n\n"), contents, error: null }
 }
