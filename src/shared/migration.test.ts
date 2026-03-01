@@ -796,7 +796,7 @@ describe("migrateAgentConfigToCategory", () => {
   test("migrates model to category when mapping exists", () => {
     // given: Config with a model that has a category mapping
     const config = {
-      model: "google/gemini-3-pro",
+      model: "google/gemini-3.1-pro",
       temperature: 0.5,
       top_p: 0.9,
     }
@@ -845,7 +845,7 @@ describe("migrateAgentConfigToCategory", () => {
   test("handles all mapped models correctly", () => {
     // given: Configs for each mapped model
     const configs = [
-      { model: "google/gemini-3-pro" },
+      { model: "google/gemini-3.1-pro" },
       { model: "google/gemini-3-flash" },
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
@@ -915,7 +915,7 @@ describe("shouldDeleteAgentConfig", () => {
     // given: Config with fields matching category defaults
     const config = {
       category: "visual-engineering",
-      model: "google/gemini-3-pro",
+      model: "google/gemini-3.1-pro",
     }
 
     // when: Check if config should be deleted
@@ -1043,7 +1043,7 @@ describe("migrateConfigFile with backup", () => {
       agents: {
         "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
         oracle: { model: "openai/gpt-5.2" },
-        "my-custom-agent": { model: "google/gemini-3-pro" },
+        "my-custom-agent": { model: "google/gemini-3.1-pro" },
       },
     }
 
@@ -1059,7 +1059,7 @@ describe("migrateConfigFile with backup", () => {
     const agents = rawConfig.agents as Record<string, Record<string, unknown>>
     expect(agents["multimodal-looker"].model).toBe("anthropic/claude-haiku-4-5")
     expect(agents.oracle.model).toBe("openai/gpt-5.2")
-    expect(agents["my-custom-agent"].model).toBe("google/gemini-3-pro")
+    expect(agents["my-custom-agent"].model).toBe("google/gemini-3.1-pro")
   })
 
   test("preserves category setting when explicitly set", () => {

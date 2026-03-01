@@ -71,7 +71,12 @@ export interface DelegateTaskToolOptions {
 
 export interface BuildSystemContentInput {
   skillContent?: string
+  skillContents?: string[]
   categoryPromptAppend?: string
+  agentsContext?: string
+  planAgentPrepend?: string
+  maxPromptTokens?: number
+  model?: { providerID: string; modelID: string; variant?: string }
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

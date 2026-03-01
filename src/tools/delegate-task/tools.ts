@@ -142,7 +142,7 @@ Prompts MUST be in English.`
 
       const runInBackground = args.run_in_background === true
 
-      const { content: skillContent, error: skillError } = await resolveSkillContent(args.load_skills, {
+      const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(args.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         disabledSkills: options.disabledSkills,
         directory: options.directory,
@@ -184,6 +184,7 @@ Prompts MUST be in English.`
       let actualModel: string | undefined
       let isUnstableAgent = false
       let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
+      let maxPromptTokens: number | undefined
 
       if (args.category) {
         const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
@@ -197,6 +198,7 @@ Prompts MUST be in English.`
         actualModel = resolution.actualModel
         isUnstableAgent = resolution.isUnstableAgent
         fallbackChain = resolution.fallbackChain
+        maxPromptTokens = resolution.maxPromptTokens
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
@@ -213,8 +215,11 @@ Prompts MUST be in English.`
         if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
           const systemContent = buildSystemContent({
             skillContent,
+            skillContents,
             categoryPromptAppend,
             agentName: agentToUse,
+            maxPromptTokens,
+            model: categoryModel,
             availableCategories,
             availableSkills,
           })
@@ -232,8 +237,11 @@ Prompts MUST be in English.`
 
       const systemContent = buildSystemContent({
         skillContent,
+        skillContents,
         categoryPromptAppend,
         agentName: agentToUse,
+        maxPromptTokens,
+        model: categoryModel,
         availableCategories,
         availableSkills,
       })

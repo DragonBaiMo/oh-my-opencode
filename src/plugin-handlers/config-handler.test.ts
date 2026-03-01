@@ -562,7 +562,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("google/gemini-3-pro")
+    expect(config?.model).toBe("google/gemini-3.1-pro")
   })
 
   test("user categories override default categories", () => {
@@ -1153,8 +1153,6 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     getAgentDisplayName("sisyphus"),
     getAgentDisplayName("hephaestus"),
     getAgentDisplayName("atlas"),
-  ])
-  const AGENTS_WITHOUT_TODO_DENY = new Set([
     getAgentDisplayName("prometheus"),
     getAgentDisplayName("sisyphus-junior"),
   ])
@@ -1197,10 +1195,6 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     for (const agentName of AGENTS_WITH_TODO_DENY) {
       expect(agentResult[agentName]?.permission?.todowrite).toBe("deny")
       expect(agentResult[agentName]?.permission?.todoread).toBe("deny")
-    }
-    for (const agentName of AGENTS_WITHOUT_TODO_DENY) {
-      expect(agentResult[agentName]?.permission?.todowrite).toBeUndefined()
-      expect(agentResult[agentName]?.permission?.todoread).toBeUndefined()
     }
   })
 
