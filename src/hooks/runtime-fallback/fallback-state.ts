@@ -47,7 +47,25 @@ export function prepareFallback(
     return { success: false, error: "Max fallback attempts reached", maxAttemptsReached: true }
   }
 
-  const nextModel = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
+  let nextModel = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
+
+  // If loop_fallback is enabled and no available fallback models, reset and try again from the beginning
+  if (!nextModel && config.loop_fallback) {
+    log(`[${HOOK_NAME}] All fallback models in cooldown or exhausted, looping back to first model`, { sessionID })
+    state.failedModels.clear()
+    state.fallbackIndex = -1
+    nextModel = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
+    
+    if (!nextModel) {
+      return { success: false, error: "No available fallback models (loop failed)" }
+    }
+    
+    log(`[${HOOK_NAME}] Looped fallback to first model`, {
+      sessionID,
+      to: nextModel,
+      attempt: state.attemptCount + 1,
+    })
+  }
 
   if (!nextModel) {
     log(`[${HOOK_NAME}] No available fallback models`, { sessionID })

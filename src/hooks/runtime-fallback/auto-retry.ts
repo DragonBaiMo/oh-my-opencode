@@ -130,22 +130,25 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           .filter((p) => p.type === "text" && typeof p.text === "string" && p.text.length > 0)
           .map((p) => ({ type: "text" as const, text: p.text! }))
 
-        if (retryParts.length > 0) {
-          const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
-          sessionAwaitingFallbackResult.add(sessionID)
-          scheduleSessionFallbackTimeout(sessionID, retryAgent)
-
-          await ctx.client.session.promptAsync({
-            path: { id: sessionID },
-            body: {
-              ...(retryAgent ? { agent: retryAgent } : {}),
-              model: fallbackModelObj,
-              parts: retryParts,
-            },
-            query: { directory: ctx.directory },
-          })
-          retryDispatched = true
-        }
+                                      if (retryParts.length > 0) {
+                                        const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+                                        sessionAwaitingFallbackResult.add(sessionID)
+                                        scheduleSessionFallbackTimeout(sessionID, retryAgent)
+                              
+                                        // Determine whether to override agent based on strategy config
+                                        const shouldSwitchAgent = config.strategy === "agent" || config.strategy === "both"
+                              
+                                        await ctx.client.session.promptAsync({
+                                          path: { id: sessionID },
+                                          body: {
+                                            ...(shouldSwitchAgent && retryAgent ? { agent: retryAgent } : {}),
+                                            model: fallbackModelObj,
+                                            parts: retryParts,
+                                          },
+                                          query: { directory: ctx.directory },
+                                        })
+                                        retryDispatched = true
+                                      }
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
       }

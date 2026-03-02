@@ -3,6 +3,8 @@ import { z } from "zod"
 export const RuntimeFallbackConfigSchema = z.object({
   /** Enable runtime fallback (default: false) */
   enabled: z.boolean().optional(),
+  /** Fallback strategy: "model" = only switch model, "agent" = switch to different agent, "both" = try model first then agent (default: "model") */
+  strategy: z.enum(["model", "agent", "both"]).optional(),
   /** HTTP status codes that trigger fallback (default: [400, 429, 503, 529]) */
   retry_on_errors: z.array(z.number()).optional(),
   /** Maximum fallback attempts per session (default: 3) */
@@ -13,6 +15,8 @@ export const RuntimeFallbackConfigSchema = z.object({
   timeout_seconds: z.number().min(0).optional(),
   /** Show toast notification when switching to fallback model (default: true) */
   notify_on_fallback: z.boolean().optional(),
+  /** Loop back to first fallback model after all models exhausted (default: false) */
+  loop_fallback: z.boolean().optional(),
 })
 
 export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>

@@ -7,15 +7,16 @@
 import type { RuntimeFallbackConfig } from "../../config"
 
 /**
- * Default configuration values for runtime fallback
  */
-export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
+ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   enabled: false,
   retry_on_errors: [429, 500, 502, 503, 504],
+  strategy: "model",
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,
   notify_on_fallback: true,
+  loop_fallback: false,
 }
 
 /**

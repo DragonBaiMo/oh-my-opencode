@@ -3849,6 +3849,14 @@
             "enabled": {
               "type": "boolean"
             },
+            "strategy": {
+              "type": "string",
+              "enum": [
+                "model",
+                "agent",
+                "both"
+              ]
+            },
             "retry_on_errors": {
               "type": "array",
               "items": {
@@ -3869,6 +3877,9 @@
               "minimum": 0
             },
             "notify_on_fallback": {
+              "type": "boolean"
+            },
+            "loop_fallback": {
               "type": "boolean"
             }
           },
