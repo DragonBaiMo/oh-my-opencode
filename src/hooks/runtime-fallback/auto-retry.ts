@@ -8,12 +8,14 @@ import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
+const RETRY_DEBOUNCE_MS = 3000
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): ReturnType<typeof globalThis.setTimeout>
 declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
 
 export function createAutoRetryHelpers(deps: HookDeps) {
   const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig } = deps
+  const sessionLastRetryAt = new Map<string, number>()
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
     try {
@@ -87,6 +89,15 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       return
     }
 
+    const lastRetryAt = sessionLastRetryAt.get(sessionID)
+    if (lastRetryAt && Date.now() - lastRetryAt < RETRY_DEBOUNCE_MS) {
+      log(`[${HOOK_NAME}] Retry debounced to avoid duplicate runs (${source})`, {
+        sessionID,
+        elapsedMs: Date.now() - lastRetryAt,
+      })
+      return
+    }
+
     const modelParts = newModel.split("/")
     if (modelParts.length < 2) {
       log(`[${HOOK_NAME}] Invalid model format (missing provider prefix): ${newModel}`)
@@ -105,53 +116,32 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
     try {
-      const messagesResp = await ctx.client.session.messages({
+      log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
+        sessionID,
+        model: newModel,
+      })
+
+      const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+      sessionAwaitingFallbackResult.add(sessionID)
+      scheduleSessionFallbackTimeout(sessionID, retryAgent)
+
+      // Keep continuation in current session; do not replay the original user request.
+      // Replaying the full request can relaunch ULW batches and create many new runnings.
+      const retryParts = [{ type: "text" as const, text: "continue" }]
+
+      const shouldSwitchAgent = config.strategy === "agent" || config.strategy === "both"
+
+      await ctx.client.session.promptAsync({
         path: { id: sessionID },
+        body: {
+          ...(shouldSwitchAgent && retryAgent ? { agent: retryAgent } : {}),
+          model: fallbackModelObj,
+          parts: retryParts,
+        },
         query: { directory: ctx.directory },
       })
-      const msgs = (messagesResp as {
-        data?: Array<{
-          info?: Record<string, unknown>
-          parts?: Array<{ type?: string; text?: string }>
-        }>
-      }).data
-      const lastUserMsg = msgs?.filter((m) => m.info?.role === "user").pop()
-      const lastUserPartsRaw =
-        lastUserMsg?.parts ??
-        (lastUserMsg?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
-
-      if (lastUserPartsRaw && lastUserPartsRaw.length > 0) {
-        log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
-          sessionID,
-          model: newModel,
-        })
-
-        const retryParts = lastUserPartsRaw
-          .filter((p) => p.type === "text" && typeof p.text === "string" && p.text.length > 0)
-          .map((p) => ({ type: "text" as const, text: p.text! }))
-
-                                      if (retryParts.length > 0) {
-                                        const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
-                                        sessionAwaitingFallbackResult.add(sessionID)
-                                        scheduleSessionFallbackTimeout(sessionID, retryAgent)
-                              
-                                        // Determine whether to override agent based on strategy config
-                                        const shouldSwitchAgent = config.strategy === "agent" || config.strategy === "both"
-                              
-                                        await ctx.client.session.promptAsync({
-                                          path: { id: sessionID },
-                                          body: {
-                                            ...(shouldSwitchAgent && retryAgent ? { agent: retryAgent } : {}),
-                                            model: fallbackModelObj,
-                                            parts: retryParts,
-                                          },
-                                          query: { directory: ctx.directory },
-                                        })
-                                        retryDispatched = true
-                                      }
-      } else {
-        log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
-      }
+      retryDispatched = true
+      sessionLastRetryAt.set(sessionID, Date.now())
     } catch (retryError) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
@@ -204,6 +194,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       if (now - lastAccess > SESSION_TTL_MS) {
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
+        sessionLastRetryAt.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)

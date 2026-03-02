@@ -34,9 +34,9 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /try.?again/i,
   /credit.*balance.*too.*low/i,
   /insufficient.?(?:credits?|funds?|balance)/i,
-  /(?:^|\s)429(?:\s|$)/,
-  /(?:^|\s)503(?:\s|$)/,
   /(?:^|\s)529(?:\s|$)/,
+  /(?:^|\s)502(?:\s|$)/,
+  /bad.?gateway/i,
 ]
 
 /**
