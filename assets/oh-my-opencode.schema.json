@@ -3921,6 +3921,10 @@
         "messageStalenessTimeoutMs": {
           "type": "number",
           "minimum": 60000
+        },
+        "syncPollTimeoutMs": {
+          "type": "number",
+          "minimum": 60000
         }
       },
       "additionalProperties": false
@@ -4039,6 +4043,19 @@
           "additionalProperties": false
         }
       },
+      "additionalProperties": false
+    },
+    "start_work": {
+      "type": "object",
+      "properties": {
+        "auto_commit": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "auto_commit"
+      ],
       "additionalProperties": false
     },
     "_migrations": {

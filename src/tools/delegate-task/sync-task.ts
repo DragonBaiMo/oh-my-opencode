@@ -24,7 +24,7 @@ export async function executeSyncTask(
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { client, directory, onSyncSessionCreated } = executorCtx
+  const { client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -118,7 +118,7 @@ export async function executeSyncTask(
         agentToUse,
         toastManager,
         taskId,
-      })
+      }, syncPollTimeoutMs)
       if (pollError) {
         return pollError
       }

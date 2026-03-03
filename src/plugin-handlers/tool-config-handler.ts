@@ -106,9 +106,9 @@ export function applyToolConfig(params: {
   }
 
   params.config.permission = {
+    external_directory: "allow",
     ...(params.config.permission as Record<string, unknown>),
     webfetch: "deny",
-    external_directory: "allow",
     task: "deny",
   };
 }
