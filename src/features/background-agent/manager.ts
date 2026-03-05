@@ -30,7 +30,6 @@ import {
 } from "./constants"
 
 import { subagentSessions } from "../claude-code-session-state"
-import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import {
   isAbortedSessionError,
@@ -190,18 +189,6 @@ export class BackgroundManager {
 
     log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
 
-    const toastManager = getTaskToastManager()
-    if (toastManager) {
-      toastManager.addTask({
-        id: task.id,
-        description: input.description,
-        agent: input.agent,
-        isBackground: true,
-        status: "queued",
-        skills: input.skills,
-      })
-    }
-
     // Trigger processing (fire-and-forget)
     this.processKey(key)
 
@@ -325,11 +312,6 @@ export class BackgroundManager {
     this.startPolling()
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
-
-    const toastManager = getTaskToastManager()
-    if (toastManager) {
-      toastManager.updateTask(task.id, "running")
-    }
 
     log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
       sessionID,
@@ -595,16 +577,6 @@ export class BackgroundManager {
       this.pendingByParent.set(input.parentSessionID, pending)
     }
 
-    const toastManager = getTaskToastManager()
-    if (toastManager) {
-      toastManager.addTask({
-        id: existingTask.id,
-        description: existingTask.description,
-        agent: existingTask.agent,
-        isBackground: true,
-      })
-    }
-
     log("[background-agent] Resuming task:", { taskId: existingTask.id, sessionID: existingTask.sessionID })
 
     log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
@@ -807,10 +779,6 @@ export class BackgroundManager {
       this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
-      const toastManager = getTaskToastManager()
-      if (toastManager) {
-        toastManager.removeTask(task.id)
-      }
       if (task.sessionID) {
         subagentSessions.delete(task.sessionID)
       }
@@ -860,10 +828,6 @@ export class BackgroundManager {
         this.cleanupPendingByParent(task)
         this.tasks.delete(task.id)
         this.clearNotificationsForTask(task.id)
-        const toastManager = getTaskToastManager()
-        if (toastManager) {
-          toastManager.removeTask(task.id)
-        }
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
         }
@@ -1105,10 +1069,6 @@ export class BackgroundManager {
     }
 
     if (options?.skipNotification) {
-      const toastManager = getTaskToastManager()
-      if (toastManager) {
-        toastManager.removeTask(task.id)
-      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1237,16 +1197,6 @@ export class BackgroundManager {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
-
-    // Show toast notification
-    const toastManager = getTaskToastManager()
-    if (toastManager) {
-      toastManager.showCompletionToast({
-        id: task.id,
-        description: task.description,
-        duration,
-      })
-    }
 
     // Update pending tracking and check if all tasks complete
     const pendingSet = this.pendingByParent.get(task.parentSessionID)
@@ -1456,10 +1406,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
         this.clearNotificationsForTask(taskId)
-        const toastManager = getTaskToastManager()
-        if (toastManager) {
-          toastManager.removeTask(taskId)
-        }
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
