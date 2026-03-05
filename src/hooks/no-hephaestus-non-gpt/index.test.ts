@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, spyOn, test } from "bun:test"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, markRuntimeFallbackRetry, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoHephaestusNonGptHook } from "./index"
 
@@ -140,6 +140,35 @@ describe("no-hephaestus-non-gpt hook", () => {
     }, output)
 
     // then - toast shown via session-agent fallback, switched to sisyphus
+    expect(showToast).toHaveBeenCalledTimes(1)
+    expect(output.message.agent).toBe(SISYPHUS_DISPLAY)
+  })
+
+  test("skips enforcement once for runtime fallback retry", async () => {
+    _resetForTesting()
+    markRuntimeFallbackRetry("ses_retry")
+
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
+    const hook = createNoHephaestusNonGptHook({
+      client: { tui: { showToast } },
+    } as any)
+
+    const output = createOutput()
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }, output)
+
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
+
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    }, output)
+
     expect(showToast).toHaveBeenCalledTimes(1)
     expect(output.message.agent).toBe(SISYPHUS_DISPLAY)
   })

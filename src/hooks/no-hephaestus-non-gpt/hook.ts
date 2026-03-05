@@ -1,6 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
-import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  consumeRuntimeFallbackSkipNoHephaestusNonGpt,
+  getSessionAgent,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
@@ -44,6 +48,13 @@ export function createNoHephaestusNonGptHook(
     }, output?: {
       message?: { agent?: string; [key: string]: unknown }
     }): Promise<void> => {
+      if (consumeRuntimeFallbackSkipNoHephaestusNonGpt(input.sessionID)) {
+        log("[no-hephaestus-non-gpt] Skip agent enforcement for runtime fallback retry", {
+          sessionID: input.sessionID,
+        })
+        return
+      }
+
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
       const modelID = input.model?.modelID

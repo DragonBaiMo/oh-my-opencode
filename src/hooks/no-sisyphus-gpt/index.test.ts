@@ -1,5 +1,7 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, spyOn, test } from "bun:test"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, markRuntimeFallbackRetry, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoSisyphusGptHook } from "./index"
 
@@ -8,7 +10,7 @@ const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 
 function createOutput() {
   return {
-    message: {},
+    message: {} as { agent?: string; [key: string]: unknown },
     parts: [],
   }
 }
@@ -16,7 +18,7 @@ function createOutput() {
 describe("no-sisyphus-gpt hook", () => {
   test("shows toast on every chat.message when sisyphus uses gpt model", async () => {
     // given - sisyphus (display name) with gpt model
-    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
     } as any)
@@ -40,18 +42,20 @@ describe("no-sisyphus-gpt hook", () => {
     expect(showToast).toHaveBeenCalledTimes(2)
     expect(output1.message.agent).toBe(HEPHAESTUS_DISPLAY)
     expect(output2.message.agent).toBe(HEPHAESTUS_DISPLAY)
-    expect(showToast.mock.calls[0]?.[0]).toMatchObject({
-      body: {
-        title: "NEVER Use Sisyphus with GPT",
-        message: expect.stringContaining("For GPT models, always use Hephaestus."),
-        variant: "error",
-      },
-    })
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          title: "NEVER Use Sisyphus with GPT",
+          message: expect.stringContaining("For GPT models, always use Hephaestus."),
+          variant: "error",
+        }),
+      })
+    )
   })
 
   test("does not show toast for non-gpt model", async () => {
     // given - sisyphus with claude model
-    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
     } as any)
@@ -72,7 +76,7 @@ describe("no-sisyphus-gpt hook", () => {
 
   test("does not show toast for non-sisyphus agent", async () => {
     // given - hephaestus with gpt model
-    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
     } as any)
@@ -95,7 +99,7 @@ describe("no-sisyphus-gpt hook", () => {
     // given - session agent saved with display name (as OpenCode stores it)
     _resetForTesting()
     updateSessionAgent("ses_4", SISYPHUS_DISPLAY)
-    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
     } as any)
@@ -109,6 +113,35 @@ describe("no-sisyphus-gpt hook", () => {
     }, output)
 
     // then - toast shown via session-agent fallback
+    expect(showToast).toHaveBeenCalledTimes(1)
+    expect(output.message.agent).toBe(HEPHAESTUS_DISPLAY)
+  })
+
+  test("skips enforcement once for runtime fallback retry", async () => {
+    _resetForTesting()
+    markRuntimeFallbackRetry("ses_retry")
+
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook({
+      client: { tui: { showToast } },
+    } as any)
+
+    const output = createOutput()
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-5.2" },
+    }, output)
+
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
+
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-5.2" },
+    }, output)
+
     expect(showToast).toHaveBeenCalledTimes(1)
     expect(output.message.agent).toBe(HEPHAESTUS_DISPLAY)
   })

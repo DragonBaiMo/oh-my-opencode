@@ -1,5 +1,7 @@
 export const subagentSessions = new Set<string>()
 export const syncSubagentSessions = new Set<string>()
+const runtimeFallbackSkipNoSisyphusGptSessions = new Set<string>()
+const runtimeFallbackSkipNoHephaestusNonGptSessions = new Set<string>()
 
 let _mainSessionID: string | undefined
 
@@ -16,6 +18,8 @@ export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
   syncSubagentSessions.clear()
+  runtimeFallbackSkipNoSisyphusGptSessions.clear()
+  runtimeFallbackSkipNoHephaestusNonGptSessions.clear()
   sessionAgentMap.clear()
 }
 
@@ -37,4 +41,32 @@ export function getSessionAgent(sessionID: string): string | undefined {
 
 export function clearSessionAgent(sessionID: string): void {
   sessionAgentMap.delete(sessionID)
+  runtimeFallbackSkipNoSisyphusGptSessions.delete(sessionID)
+  runtimeFallbackSkipNoHephaestusNonGptSessions.delete(sessionID)
+}
+
+export function markRuntimeFallbackRetry(sessionID: string): void {
+  runtimeFallbackSkipNoSisyphusGptSessions.add(sessionID)
+  runtimeFallbackSkipNoHephaestusNonGptSessions.add(sessionID)
+}
+
+export function clearRuntimeFallbackRetry(sessionID: string): void {
+  runtimeFallbackSkipNoSisyphusGptSessions.delete(sessionID)
+  runtimeFallbackSkipNoHephaestusNonGptSessions.delete(sessionID)
+}
+
+export function consumeRuntimeFallbackSkipNoSisyphusGpt(sessionID: string): boolean {
+  const exists = runtimeFallbackSkipNoSisyphusGptSessions.has(sessionID)
+  if (exists) {
+    runtimeFallbackSkipNoSisyphusGptSessions.delete(sessionID)
+  }
+  return exists
+}
+
+export function consumeRuntimeFallbackSkipNoHephaestusNonGpt(sessionID: string): boolean {
+  const exists = runtimeFallbackSkipNoHephaestusNonGptSessions.has(sessionID)
+  if (exists) {
+    runtimeFallbackSkipNoHephaestusNonGptSessions.delete(sessionID)
+  }
+  return exists
 }
