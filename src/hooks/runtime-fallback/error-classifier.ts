@@ -92,6 +92,15 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "model_not_found"
   }
 
+  if (
+    errorName?.includes("jsonparse")
+    || /json\s*parse\s*error/i.test(message)
+    || /json\s*parsing\s*failed/i.test(message)
+    || /ai_jsonparseerror/i.test(message)
+  ) {
+    return "json_parse_error"
+  }
+
   return undefined
 }
 
@@ -158,6 +167,10 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "model_not_found") {
+    return true
+  }
+
+  if (errorType === "json_parse_error") {
     return true
   }
 

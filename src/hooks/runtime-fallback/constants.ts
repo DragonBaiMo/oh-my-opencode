@@ -37,6 +37,11 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /(?:^|\s)529(?:\s|$)/,
   /(?:^|\s)502(?:\s|$)/,
   /bad.?gateway/i,
+  /json\s*parse\s*error/i,
+  /json\s*parsing\s*failed/i,
+  /ai_jsonparseerror/i,
+  /chat\.completion\.chunk/i,
+  /malformed\s+json/i,
 ]
 
 /**

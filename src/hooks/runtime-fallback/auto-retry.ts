@@ -2,10 +2,12 @@ import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import { clearRuntimeFallbackRetry, getSessionAgent, markRuntimeFallbackRetry } from "../../features/claude-code-session-state"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { isGptModel } from "../../agents/types"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 const RETRY_DEBOUNCE_MS = 3000
@@ -16,6 +18,7 @@ declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>)
 export function createAutoRetryHelpers(deps: HookDeps) {
   const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig } = deps
   const sessionLastRetryAt = new Map<string, number>()
+  const sessionLastRetryModel = new Map<string, string>()
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
     try {
@@ -90,10 +93,17 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     }
 
     const lastRetryAt = sessionLastRetryAt.get(sessionID)
-    if (lastRetryAt && Date.now() - lastRetryAt < RETRY_DEBOUNCE_MS) {
+    const lastModel = sessionLastRetryModel.get(sessionID)
+    if (
+      source !== "session.timeout"
+      && lastRetryAt
+      && Date.now() - lastRetryAt < RETRY_DEBOUNCE_MS
+      && lastModel === newModel
+    ) {
       log(`[${HOOK_NAME}] Retry debounced to avoid duplicate runs (${source})`, {
         sessionID,
         elapsedMs: Date.now() - lastRetryAt,
+        model: newModel,
       })
       return
     }
@@ -121,20 +131,36 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         model: newModel,
       })
 
-      const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+      const shouldSwitchAgent = config.strategy === "agent" || config.strategy === "both"
+      const sessionStoredAgent = getSessionAgent(sessionID)
+      const resolvedRetryAgentKey = resolvedAgent ?? sessionStoredAgent
+      const normalizedRetryAgentKey = resolvedRetryAgentKey
+        ? getAgentConfigKey(resolvedRetryAgentKey)
+        : undefined
+      const configuredDefaultAgent = typeof pluginConfig?.default_agent === "string"
+        ? getAgentConfigKey(pluginConfig.default_agent)
+        : undefined
+      const stateModel = sessionStates.get(sessionID)?.originalModel
+        ?? sessionStates.get(sessionID)?.currentModel
+        ?? newModel
+      const stateModelID = stateModel.split("/").slice(1).join("/")
+      const inferredAgentByModel = isGptModel(stateModelID) ? "hephaestus" : "sisyphus"
+      const retryAgentKey = normalizedRetryAgentKey ?? configuredDefaultAgent ?? inferredAgentByModel
       sessionAwaitingFallbackResult.add(sessionID)
-      scheduleSessionFallbackTimeout(sessionID, retryAgent)
+      scheduleSessionFallbackTimeout(sessionID, retryAgentKey)
 
       // Keep continuation in current session; do not replay the original user request.
       // Replaying the full request can relaunch ULW batches and create many new runnings.
       const retryParts = [{ type: "text" as const, text: "continue" }]
 
-      const shouldSwitchAgent = config.strategy === "agent" || config.strategy === "both"
+      if (!shouldSwitchAgent) {
+        markRuntimeFallbackRetry(sessionID)
+      }
 
       await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {
-          ...(shouldSwitchAgent && retryAgent ? { agent: retryAgent } : {}),
+          agent: retryAgentKey,
           model: fallbackModelObj,
           parts: retryParts,
         },
@@ -142,11 +168,13 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       })
       retryDispatched = true
       sessionLastRetryAt.set(sessionID, Date.now())
+      sessionLastRetryModel.set(sessionID, newModel)
     } catch (retryError) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
       sessionRetryInFlight.delete(sessionID)
       if (!retryDispatched) {
+        clearRuntimeFallbackRetry(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
         const state = sessionStates.get(sessionID)
@@ -195,6 +223,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
         sessionLastRetryAt.delete(sessionID)
+        sessionLastRetryModel.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
