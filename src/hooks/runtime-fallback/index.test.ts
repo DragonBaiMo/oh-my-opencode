@@ -73,6 +73,71 @@ describe("runtime-fallback", () => {
   }
 
   describe("session.error handling", () => {
+    test("should always inject fallback retry agent to prevent host agent undefined", async () => {
+      const promptCalls: Array<{ body?: Record<string, unknown> }> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as { body?: Record<string, unknown> })
+              return {}
+            },
+            abort: async () => ({}),
+          },
+        }),
+        {
+          config: createMockConfig({
+            strategy: "model",
+            notify_on_fallback: false,
+            retry_on_errors: [429],
+          }),
+          pluginConfig: {
+            agents: {
+              hephaestus: {
+                model: "openai/gpt-5.3-codex",
+                fallback_models: ["openai/gpt-5.2"],
+              },
+            },
+          } as unknown as OhMyOpenCodeConfig,
+        }
+      )
+
+      const sessionID = "test-agent-key-normalization"
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "openai/gpt-5.3-codex" } },
+        },
+      })
+
+      await hook["chat.message"]?.(
+        {
+          sessionID,
+          agent: "hephaestus",
+          model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+        },
+        {
+          message: {},
+          parts: [{ type: "text", text: "hi" }],
+        }
+      )
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      expect(promptCalls.length).toBeGreaterThan(0)
+      const lastCall = promptCalls[promptCalls.length - 1]
+      const agentValue = lastCall?.body?.["agent"]
+      expect(agentValue).toBe("hephaestus")
+    })
+
     test("should detect retryable error with status code 429", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
       const sessionID = "test-session-123"
@@ -2276,7 +2341,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
+      const autoRetryLog = logCalls.find((call) => call.msg.includes("Auto-retrying with fallback model"))
       expect(autoRetryLog).toBeDefined()
 
       //#when - second error fires after retry completed (retryInFlight cleared)
