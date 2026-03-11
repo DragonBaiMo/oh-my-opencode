@@ -46,6 +46,7 @@ import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
+import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -209,7 +210,7 @@ export class BackgroundManager {
 
         await this.concurrencyManager.acquire(key)
 
-        if (item.task.status === "cancelled" || item.task.status === "error") {
+        if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -219,9 +220,10 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
-          // Release concurrency slot if startTask failed and didn't release it itself
-          // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
-          if (!item.task.concurrencyKey) {
+          if (item.task.concurrencyKey) {
+            this.concurrencyManager.release(item.task.concurrencyKey)
+            item.task.concurrencyKey = undefined
+          } else {
             this.concurrencyManager.release(key)
           }
         }
@@ -365,6 +367,8 @@ export class BackgroundManager {
           this.concurrencyManager.release(existingTask.concurrencyKey)
           existingTask.concurrencyKey = undefined
         }
+
+        removeTaskToastTracking(existingTask.id)
 
         // Abort the session to prevent infinite polling hang
         this.client.session.abort({
@@ -624,6 +628,8 @@ export class BackgroundManager {
         this.concurrencyManager.release(existingTask.concurrencyKey)
         existingTask.concurrencyKey = undefined
       }
+
+      removeTaskToastTracking(existingTask.id)
 
       // Abort the session to prevent infinite polling hang
       if (existingTask.sessionID) {
@@ -1068,6 +1074,8 @@ export class BackgroundManager {
       SessionCategoryRegistry.remove(task.sessionID)
     }
 
+    removeTaskToastTracking(task.id)
+
     if (options?.skipNotification) {
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
@@ -1153,6 +1161,8 @@ export class BackgroundManager {
     task.status = "completed"
     task.completedAt = new Date()
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+
+    removeTaskToastTracking(task.id)
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
     if (task.concurrencyKey) {
@@ -1389,6 +1399,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined
         }
+        removeTaskToastTracking(task.id)
         this.cleanupPendingByParent(task)
         if (wasPending) {
           const key = task.model
