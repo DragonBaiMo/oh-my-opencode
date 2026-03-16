@@ -50,7 +50,6 @@ export const HookNameSchema = z.enum([
   "write-existing-file-guard",
   "anthropic-effort",
   "hashline-read-enhancer",
-  "openclaw-bridge",
   "read-image-resizer",
   "openclaw-sender",
 ])
