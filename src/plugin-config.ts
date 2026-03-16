@@ -11,6 +11,15 @@ import {
   migrateConfigFile,
 } from "./shared";
 
+const PARTIAL_STRING_ARRAY_KEYS = new Set([
+  "disabled_mcps",
+  "disabled_agents",
+  "disabled_skills",
+  "disabled_hooks",
+  "disabled_commands",
+  "disabled_tools",
+]);
+
 export function parseConfigPartially(
   rawConfig: Record<string, unknown>
 ): OhMyOpenCodeConfig | null {
@@ -23,6 +32,14 @@ export function parseConfigPartially(
   const invalidSections: string[] = [];
 
   for (const key of Object.keys(rawConfig)) {
+    if (PARTIAL_STRING_ARRAY_KEYS.has(key)) {
+      const sectionValue = rawConfig[key];
+      if (Array.isArray(sectionValue) && sectionValue.every((value) => typeof value === "string")) {
+        partialConfig[key] = sectionValue;
+      }
+      continue;
+    }
+
     const sectionResult = OhMyOpenCodeConfigSchema.safeParse({ [key]: rawConfig[key] });
     if (sectionResult.success) {
       const parsed = sectionResult.data as Record<string, unknown>;
@@ -127,6 +144,12 @@ export function mergeConfigs(
       ...new Set([
         ...(base.disabled_skills ?? []),
         ...(override.disabled_skills ?? []),
+      ]),
+    ],
+    disabled_tools: [
+      ...new Set([
+        ...(base.disabled_tools ?? []),
+        ...(override.disabled_tools ?? []),
       ]),
     ],
     claude_code: deepMerge(base.claude_code, override.claude_code),

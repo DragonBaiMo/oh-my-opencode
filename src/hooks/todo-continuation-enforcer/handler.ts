@@ -17,6 +17,7 @@ export function createTodoContinuationHandler(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  shouldSkipContinuation?: (sessionID: string) => boolean
 }): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
   const {
     ctx,
@@ -24,6 +25,7 @@ export function createTodoContinuationHandler(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    shouldSkipContinuation,
   } = args
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -56,7 +58,19 @@ export function createTodoContinuationHandler(args: {
         backgroundManager,
         skipAgents,
         isContinuationStopped,
+        shouldSkipContinuation,
       })
+      return
+    }
+
+    if (event.type === "session.compacted") {
+      const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
+      if (sessionID) {
+        const state = sessionStateStore.getState(sessionID)
+        state.recentCompactionAt = Date.now()
+        sessionStateStore.cancelCountdown(sessionID)
+        log(`[${HOOK_NAME}] Session compacted: marked recentCompactionAt`, { sessionID })
+      }
       return
     }
 

@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   AgentOverrideConfigSchema,
@@ -402,6 +404,17 @@ describe("HookNameSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("rejects removed delegate-task-english-directive hook name", () => {
+    //#given
+    const input = "delegate-task-english-directive"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("Sisyphus-Junior agent override", () => {
@@ -753,6 +766,25 @@ describe("GitMasterConfigSchema", () => {
     const result = GitMasterConfigSchema.safeParse(config)
 
     //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts shell-safe git_env_prefix", () => {
+    const config = { git_env_prefix: "MY_HOOK=active" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_env_prefix).toBe("MY_HOOK=active")
+    }
+  })
+
+  test("rejects git_env_prefix with shell metacharacters", () => {
+    const config = { git_env_prefix: "A=1; rm -rf /" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
     expect(result.success).toBe(false)
   })
 })

@@ -25,8 +25,8 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
-  createOpenClawBridge,
 } from "../../hooks"
+import { createOpenClawSenderHook } from "../../hooks/openclaw-sender"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
@@ -61,7 +61,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  openclawBridge: ReturnType<typeof createOpenClawBridge> | null
+  openclawSender: ReturnType<typeof createOpenClawSenderHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -263,9 +263,11 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
-  const openclawBridge = isHookEnabled("openclaw-bridge")
-    ? safeHook("openclaw-bridge", () => createOpenClawBridge(ctx))
+
+  const openclawSender = isHookEnabled("openclaw-sender") && pluginConfig.openclaw?.enabled
+    ? safeHook("openclaw-sender", () => createOpenClawSenderHook(ctx, pluginConfig.openclaw!))
     : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -290,6 +292,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
-    openclawBridge,
+    openclawSender,
   }
 }

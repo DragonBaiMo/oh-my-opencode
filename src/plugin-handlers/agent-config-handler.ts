@@ -15,6 +15,10 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
+import {
+  createProtectedAgentNameSet,
+  filterProtectedAgentOverrides,
+} from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 import { isClaudeCodeFeatureEnabled } from "../shared/claude-code-compat";
@@ -44,7 +48,10 @@ export async function applyAgentConfig(params: {
     },
   ) as typeof params.pluginConfig.disabled_agents;
 
-  const includeClaudeSkillsForAwareness = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "skills");
+  const includeClaudeSkillsForAwareness = isClaudeCodeFeatureEnabled(
+    params.pluginConfig.claude_code,
+    "skills",
+  );
   const [
     discoveredConfigSourceSkills,
     discoveredUserSkills,
@@ -77,6 +84,34 @@ export async function applyAgentConfig(params: {
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
+  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
+  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const rawPluginAgents = params.pluginComponents.agents;
+
+  const pluginAgents = Object.fromEntries(
+    Object.entries(rawPluginAgents).map(([key, value]) => [
+      key,
+      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+    ]),
+  );
+
+  const configAgent = params.config.agent as AgentConfigRecord | undefined;
+
+  const customAgentSummaries = [
+    ...Object.entries(configAgent ?? {}),
+    ...Object.entries(userAgents),
+    ...Object.entries(projectAgents),
+    ...Object.entries(pluginAgents).filter(([, config]) => config !== undefined),
+  ]
+    .filter(([, config]) => config != null)
+    .map(([name, config]) => ({
+      name,
+      description: typeof (config as Record<string, unknown>)?.description === "string"
+        ? ((config as Record<string, unknown>).description as string)
+        : "",
+    }));
+
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -85,23 +120,11 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.categories,
     params.pluginConfig.git_master,
     allDiscoveredSkills,
-    params.ctx.client,
+    customAgentSummaries,
     currentModel,
     disabledSkills,
     useTaskSystem,
     disableOmoEnv,
-  );
-
-  const includeClaudeAgents = isClaudeCodeFeatureEnabled(params.pluginConfig.claude_code, "agents");
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
-
-  const rawPluginAgents = params.pluginComponents.agents;
-  const pluginAgents = Object.fromEntries(
-    Object.entries(rawPluginAgents).map(([key, value]) => [
-      key,
-      value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-    ]),
   );
 
   const disabledAgentNames = new Set(
@@ -121,8 +144,6 @@ export async function applyAgentConfig(params: {
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
 
-  const configAgent = params.config.agent as AgentConfigRecord | undefined;
-
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
@@ -138,7 +159,7 @@ export async function applyAgentConfig(params: {
 
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
-      undefined,
+      (builtinAgents.atlas as { model?: string } | undefined)?.model,
       useTaskSystem,
     );
 
@@ -196,19 +217,21 @@ export async function applyAgentConfig(params: {
         )
       : undefined;
 
-    // Collect all builtin agent names to prevent user/project .md files from overriding them
-    const builtinAgentNames = new Set([
+    const protectedBuiltinAgentNames = createProtectedAgentNameSet([
       ...Object.keys(agentConfig),
       ...Object.keys(builtinAgents),
     ]);
-
-    // Filter user/project agents that duplicate builtin agents (they have mode: "subagent" hardcoded
-    // in loadAgentsFromDir which would incorrectly override the builtin mode: "primary")
-    const filteredUserAgents = Object.fromEntries(
-      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredUserAgents = filterProtectedAgentOverrides(
+      userAgents,
+      protectedBuiltinAgentNames,
     );
-    const filteredProjectAgents = Object.fromEntries(
-      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredProjectAgents = filterProtectedAgentOverrides(
+      projectAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredPluginAgents = filterProtectedAgentOverrides(
+      pluginAgents,
+      protectedBuiltinAgentNames,
     );
 
     params.config.agent = {
@@ -218,26 +241,33 @@ export async function applyAgentConfig(params: {
       ),
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filterDisabledAgents(filteredPluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
     };
   } else {
-    // Filter user/project agents that duplicate builtin agents
-    const builtinAgentNames = new Set(Object.keys(builtinAgents));
-    const filteredUserAgents = Object.fromEntries(
-      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const protectedBuiltinAgentNames = createProtectedAgentNameSet(
+      Object.keys(builtinAgents),
     );
-    const filteredProjectAgents = Object.fromEntries(
-      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredUserAgents = filterProtectedAgentOverrides(
+      userAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredProjectAgents = filterProtectedAgentOverrides(
+      projectAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredPluginAgents = filterProtectedAgentOverrides(
+      pluginAgents,
+      protectedBuiltinAgentNames,
     );
 
     params.config.agent = {
       ...builtinAgents,
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filterDisabledAgents(filteredPluginAgents),
       ...configAgent,
     };
   }

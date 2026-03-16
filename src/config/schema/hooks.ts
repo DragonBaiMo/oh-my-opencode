@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 export const HookNameSchema = z.enum([
+  "gpt-permission-continuation",
   "todo-continuation-enforcer",
   "context-window-monitor",
   "session-recovery",
@@ -51,6 +52,7 @@ export const HookNameSchema = z.enum([
   "hashline-read-enhancer",
   "openclaw-bridge",
   "read-image-resizer",
+  "openclaw-sender",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

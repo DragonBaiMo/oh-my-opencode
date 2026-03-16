@@ -1,37 +1,8 @@
 import { describe, expect, test } from "bun:test"
+
 import { classifyErrorType, extractAutoRetrySignal, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback error classifier", () => {
-  test("classifies AI_JSONParseError as json_parse_error", () => {
-    //#given
-    const error = {
-      name: "AI_JSONParseError",
-      message:
-        "JSON parsing failed: Text: {\"object\":\"chat.completion.chunk\"}. Error message: JSON Parse error: Expected '}'",
-    }
-
-    //#when
-    const errorType = classifyErrorType(error)
-
-    //#then
-    expect(errorType).toBe("json_parse_error")
-  })
-
-  test("treats JSON parse stream-chunk errors as retryable", () => {
-    //#given
-    const error = {
-      name: "AI_JSONParseError",
-      message:
-        "AI_JSONParseError: JSON parsing failed: ... chat.completion.chunk ... Expected '}'",
-    }
-
-    //#when
-    const retryable = isRetryableError(error, [429, 500, 502, 503, 504, 529])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
-
   test("detects cooling-down auto-retry status signals", () => {
     //#given
     const info = {
@@ -71,6 +42,45 @@ describe("runtime-fallback error classifier", () => {
     const retryable = isRetryableError(error, [400, 403, 408, 429, 500, 502, 503, 504, 529])
 
     //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies ProviderModelNotFoundError as model_not_found", () => {
+    //#given
+    const error = {
+      name: "ProviderModelNotFoundError",
+      data: {
+        providerID: "anthropic",
+        modelID: "claude-opus-4-6",
+        message: "Model not found: anthropic/claude-opus-4-6.",
+      },
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(errorType).toBe("model_not_found")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies nested AI_LoadAPIKeyError as missing_api_key", () => {
+    //#given
+    const error = {
+      data: {
+        name: "AI_LoadAPIKeyError",
+        message:
+          "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+      },
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(errorType).toBe("missing_api_key")
     expect(retryable).toBe(true)
   })
 

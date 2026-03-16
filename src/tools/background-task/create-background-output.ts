@@ -53,7 +53,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           "Wait for completion (default: false). System notifies when done, so blocking is rarely needed."
         ),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
-      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: true)"),
+      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: false)"),
       include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
       message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 100)"),
       since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
@@ -75,7 +75,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             agent: task.agent,
             category: task.category,
             description: task.description,
-            sessionId: task.sessionID ?? "pending",
+            ...(task.sessionID ? { sessionId: task.sessionID } : {}),
           } as Record<string, unknown>,
         }
         ctx.metadata?.(meta)
@@ -87,7 +87,6 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
-        const fullSession = args.full_session ?? true
 
         let resolvedTask = task
 
@@ -123,6 +122,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const isActive = isTaskActiveStatus(resolvedTask.status)
+        const fullSession = args.full_session ?? false
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 

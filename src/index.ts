@@ -7,12 +7,15 @@ import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
 import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
+import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { deployDeepResearchScript, injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
+
+let activePluginDispose: PluginDispose | null = null
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   // Initialize config context for plugin runtime (prevents warnings from hooks)
@@ -23,6 +26,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
+  await activePluginDispose?.()
 
   try {
     const deploymentResult = await deployDeepResearchScript()
@@ -76,6 +80,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     availableSkills: toolsResult.availableSkills,
   })
 
+  const dispose = createPluginDispose({
+    backgroundManager: managers.backgroundManager,
+    skillMcpManager: managers.skillMcpManager,
+    disposeHooks: hooks.disposeHooks,
+  })
+
   const pluginInterface = createPluginInterface({
     ctx,
     pluginConfig,
@@ -85,6 +95,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     tools: toolsResult.filteredTools,
   })
 
+  activePluginDispose = dispose
+
   return {
     ...pluginInterface,
 
@@ -92,13 +104,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       _input: { sessionID: string },
       output: { context: string[] },
     ): Promise<void> => {
+      await hooks.compactionContextInjector?.capture(_input.sessionID)
       await hooks.compactionTodoPreserver?.capture(_input.sessionID)
       await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
         _input,
         output,
       )
       if (hooks.compactionContextInjector) {
-        output.context.push(hooks.compactionContextInjector(_input.sessionID))
+        output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
     },
   }

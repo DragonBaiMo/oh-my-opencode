@@ -118,6 +118,7 @@ export async function createBuiltinAgents(
     gitMasterConfig,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv,
   })

@@ -6,7 +6,7 @@ import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
-import { applyModelResolution } from "./model-resolution"
+import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
@@ -19,6 +19,7 @@ export function collectPendingBuiltinAgents(input: {
   gitMasterConfig?: GitMasterConfig
   uiSelectedModel?: string
   availableModels: Set<string>
+  isFirstRunNoCache: boolean
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
   disableOmoEnv?: boolean
@@ -34,6 +35,7 @@ export function collectPendingBuiltinAgents(input: {
     gitMasterConfig,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv = false,
   } = input
@@ -63,13 +65,16 @@ export function collectPendingBuiltinAgents(input: {
 
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
-    const resolution = applyModelResolution({
+    let resolution = applyModelResolution({
       uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
       systemDefaultModel,
     })
+    if (!resolution && isFirstRunNoCache && !override?.model) {
+      resolution = getFirstFallbackModel(requirement)
+    }
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 

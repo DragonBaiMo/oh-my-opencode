@@ -1,3 +1,18 @@
+## 2026-03-16 upstream sync: merge upstream/dev into local dev
+
+- **魔改类型**: Override
+- **需求来源**: 上游同步批次 `upstream/dev (a5e1dffc..4759dfb6)`
+- **改动范围**: 整仓上游同步（merge commit `a9bea3b0`）；冲突语义合并点为 `src/features/background-agent/manager.test.ts`、`src/features/background-agent/manager.ts`、`src/features/claude-code-agent-loader/loader.ts`、`src/hooks/runtime-fallback/auto-retry.ts`、`src/hooks/runtime-fallback/error-classifier.test.ts`、`src/hooks/runtime-fallback/hook.ts`、`src/plugin-handlers/agent-config-handler.ts`、`src/plugin/hooks/create-session-hooks.ts`，并补充对 `src/plugin/event.ts`、`src/plugin/skill-context.ts` 的类型兼容修复
+- **决策与理由**: 以 `upstream/dev` 为同步基线吸收上游修复，同时保持本地 fork 护栏（外部研究工具默认 deny，仅 librarian 放行；内置 MCP 维持禁用导出；浏览器验证路径维持 browser-tester）
+- **验收结果**: 契约✓ 回归✓ 冒烟✓
+- **证据**:
+  - 关键字审计: `git grep -n -E "playwright|playwright-cli|agent-browser|dev-browser|browser_automation_engine|context7|grep_app|websearch" -- src assets`
+  - 回归测试: `bun test src/tools/delegate-task/browser-tester-skill-injection.test.ts src/features/builtin-skills/skills.test.ts src/mcp/index.test.ts src/config/schema.test.ts` (70 pass)
+  - 类型检查: `bun run typecheck` (pass)
+  - 构建: `bun run build` (pass)
+  - 权限审计: `src/plugin-handlers/tool-config-handler.ts`（默认 deny，librarian 例外 allow）
+- **回滚**: `git revert -m 1 a9bea3b0` 撤销本次 merge；同步前本地未提交改动可通过 `git stash apply stash@{0}` 恢复
+
 ## 2026-03-09 upstream sync: merge upstream/dev into local dev
 
 - **魔改类型**: Override
