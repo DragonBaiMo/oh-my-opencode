@@ -20,6 +20,7 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
 - [Features](#features)
   - [Skills](#skills)
   - [Hooks](#hooks)
+  - [OpenClaw Integration](#openclaw-integration)
   - [Commands](#commands)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
@@ -429,6 +430,56 @@ Available hooks: `gpt-permission-continuation`, `todo-continuation-enforcer`, `c
 - `gpt-permission-continuation` — resumes GPT sessions only when the last assistant reply ends with a permission-seeking tail like `If you want, ...`. Disable it if you prefer GPT sessions to wait for explicit user follow-up.
 - `no-sisyphus-gpt` — **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
+
+### OpenClaw Integration
+
+OpenClaw integration is configured via the top-level `openclaw` field.
+
+```jsonc
+{
+  "openclaw": {
+    "enabled": true,
+    "gateways": {
+      "oc-http": {
+        "type": "http",
+        "url": "https://your-openclaw-gateway.example.com/hooks/wake",
+        "method": "POST",
+        "timeout": 10000
+      }
+    },
+    "hooks": {
+      "session-start": {
+        "gateway": "oc-http",
+        "instruction": "session start {{sessionId}}",
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+`openclaw` schema:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `enabled` | boolean | Global OpenClaw switch |
+| `gateways` | record | Named gateway definitions (`http` or `command`) |
+| `hooks` | object | Event to gateway/instruction mapping |
+
+Supported OpenClaw hook events:
+
+- `session-start`
+- `session-end`
+- `session-idle`
+- `ask-user-question`
+- `stop`
+
+Environment gates:
+
+- `OMO_OPENCLAW=1` is required for all OpenClaw dispatches.
+- `OMO_OPENCLAW_COMMAND=1` is additionally required when using `type: "command"` gateways.
+
+For full setup and troubleshooting, see [OpenClaw Integration Guide](../guide/openclaw-integration.md).
 
 ### Commands
 
