@@ -1,3 +1,17 @@
+## 2026-03-19 upstream sync: merge upstream/dev into local dev
+
+- **魔改类型**: Override
+- **需求来源**: 上游同步批次 `upstream/dev (c3b23bf6..e85fe6f1)`
+- **改动范围**: 整仓上游同步（merge commit `e85fe6f1`）；冲突语义合并点为 `src/hooks/atlas/atlas-hook.ts`、`src/hooks/atlas/tool-execute-before.ts`、`src/plugin/event.ts`、`src/tools/delegate-task/tools.ts`，并在 `src/plugin-handlers/tool-config-handler.ts` 做本地护栏回灌
+- **决策与理由**: 以 `upstream/dev` 为同步基线吸收上游修复与功能更新，同时维持本地 fork 安全边界：不回流 browser automation 链路，不恢复远程 MCP 能力放权，保留默认 deny + fail-closed 策略
+- **验收结果**: 契约✓ 回归✓ 冒烟✓
+- **证据**:
+  - 回归测试: `bun test src/tools/delegate-task/browser-tester-skill-injection.test.ts src/features/builtin-skills/skills.test.ts src/mcp/index.test.ts src/config/schema.test.ts` (70 pass)
+  - 类型检查: `bun run typecheck` (pass)
+  - 构建: `bun run build` (pass)
+  - 护栏审计: `src/plugin-handlers/tool-config-handler.ts`（移除 librarian 对 `websearch/context7_*/grep_app_*` 的 allow）；`src/features/builtin-skills/agent-browser/SKILL.md` 删除
+- **回滚**: `git revert -m 1 e85fe6f1` 撤销本次 merge
+
 ## 2026-03-16 upstream sync: merge upstream/dev into local dev
 
 - **魔改类型**: Override
