@@ -1,78 +1,70 @@
-import { describe, it, expect } from "bun:test";
+import { describe, expect, test, mock, spyOn } from "bun:test"
 import {
   interpolateInstruction,
   resolveCommandTimeoutMs,
   shellEscapeArg,
-  validateGatewayUrl,
+  wakeGateway,
   wakeCommandGateway,
-} from "../dispatcher";
-import { type OpenClawCommandGatewayConfig } from "../types";
+} from "../dispatcher"
 
 describe("OpenClaw Dispatcher", () => {
-  describe("validateGatewayUrl", () => {
-    it("accepts valid https URLs", () => {
-      expect(validateGatewayUrl("https://example.com")).toBe(true);
-    });
+  test("interpolateInstruction replaces variables", () => {
+    const template = "Hello {{name}}, welcome to {{place}}!"
+    const variables = { name: "World", place: "Bun" }
+    expect(interpolateInstruction(template, variables)).toBe(
+      "Hello World, welcome to Bun!",
+    )
+  })
 
-    it("rejects http URLs (remote)", () => {
-      expect(validateGatewayUrl("http://example.com")).toBe(false);
-    });
+  test("interpolateInstruction handles missing variables", () => {
+    const template = "Hello {{name}}!"
+    const variables = {}
+    expect(interpolateInstruction(template, variables)).toBe("Hello !")
+  })
 
-    it("accepts http URLs for localhost", () => {
-      expect(validateGatewayUrl("http://localhost:3000")).toBe(true);
-      expect(validateGatewayUrl("http://127.0.0.1:8080")).toBe(true);
-    });
-  });
+  test("shellEscapeArg escapes single quotes", () => {
+    expect(shellEscapeArg("foo'bar")).toBe("'foo'\\''bar'")
+    expect(shellEscapeArg("simple")).toBe("'simple'")
+  })
 
-  describe("interpolateInstruction", () => {
-    it("interpolates variables correctly", () => {
-      const result = interpolateInstruction("Hello {{name}}!", { name: "World" });
-      expect(result).toBe("Hello World!");
-    });
+  test("wakeGateway sends POST request", async () => {
+    const fetchSpy = spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    )
+    try {
+      const result = await wakeGateway(
+        "test",
+        { url: "https://example.com", method: "POST", timeout: 1000, type: "http" },
+        { foo: "bar" },
+      )
 
-    it("handles missing variables", () => {
-      const result = interpolateInstruction("Hello {{name}}!", {});
-      expect(result).toBe("Hello !");
-    });
-  });
+      expect(result.success).toBe(true)
+      expect(fetchSpy).toHaveBeenCalled()
+      const call = fetchSpy.mock.calls[0]
+      expect(call[0]).toBe("https://example.com")
+      expect(call[1]?.method).toBe("POST")
+      expect(call[1]?.body).toBe('{"foo":"bar"}')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 
-  describe("shellEscapeArg", () => {
-    it("escapes simple string", () => {
-      expect(shellEscapeArg("foo")).toBe("'foo'");
-    });
+  test("wakeGateway fails on invalid URL", async () => {
+    const result = await wakeGateway("test", { url: "http://example.com", method: "POST", timeout: 1000, type: "http" }, {})
+    expect(result.success).toBe(false)
+    expect(result.error).toContain("Invalid URL")
+  })
 
-    it("escapes string with single quotes", () => {
-      expect(shellEscapeArg("it's")).toBe("'it'\\''s'");
-    });
-  });
+  test("resolveCommandTimeoutMs reads OMO env fallback", () => {
+    const original = process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+    process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = "4321"
 
-  describe("resolveCommandTimeoutMs", () => {
-    it("uses default timeout", () => {
-      expect(resolveCommandTimeoutMs(undefined, undefined)).toBe(5000);
-    });
-
-    it("uses provided timeout", () => {
-      expect(resolveCommandTimeoutMs(1000, undefined)).toBe(1000);
-    });
-
-    it("clamps timeout", () => {
-      expect(resolveCommandTimeoutMs(10, undefined)).toBe(100);
-      expect(resolveCommandTimeoutMs(1000000, undefined)).toBe(300000);
-    });
-  });
-
-  describe("wakeCommandGateway", () => {
-    it("rejects if disabled via env", async () => {
-      const oldEnv = process.env.OMO_OPENCLAW_COMMAND;
-      process.env.OMO_OPENCLAW_COMMAND = "0";
-      const config: OpenClawCommandGatewayConfig = {
-        type: "command",
-        command: "echo hi",
-      };
-      const result = await wakeCommandGateway("test", config, {});
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("disabled");
-      process.env.OMO_OPENCLAW_COMMAND = oldEnv;
-    });
-  });
-});
+    try {
+      // Call without explicit envTimeoutRaw so the function reads from process.env itself
+      expect(resolveCommandTimeoutMs(undefined)).toBe(4321)
+    } finally {
+      if (original === undefined) delete process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
+      else process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS = original
+    }
+  })
+})

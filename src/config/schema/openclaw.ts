@@ -1,51 +1,50 @@
-import { z } from "zod";
+import { z } from "zod"
 
-export const OpenClawHookEventSchema = z.enum([
-  "session-start",
-  "session-end",
-  "session-idle",
-  "ask-user-question",
-  "stop",
-]);
-
-export const OpenClawHttpGatewayConfigSchema = z.object({
-  type: z.literal("http").optional(),
-  url: z.string(), // Allow looser URL validation as it might contain placeholders
+export const OpenClawGatewaySchema = z.object({
+  type: z.enum(["http", "command"]).default("http"),
+  // HTTP specific
+  url: z.string().optional(),
+  method: z.string().default("POST"),
   headers: z.record(z.string(), z.string()).optional(),
-  method: z.enum(["POST", "PUT"]).optional(),
+  // Command specific
+  command: z.string().optional(),
+  // Shared
   timeout: z.number().optional(),
-});
+})
 
-export const OpenClawCommandGatewayConfigSchema = z.object({
-  type: z.literal("command"),
-  command: z.string(),
-  timeout: z.number().optional(),
-});
-
-export const OpenClawGatewayConfigSchema = z.union([
-  OpenClawHttpGatewayConfigSchema,
-  OpenClawCommandGatewayConfigSchema,
-]);
-
-export const OpenClawHookMappingSchema = z.object({
+export const OpenClawHookSchema = z.object({
+  enabled: z.boolean().default(true),
   gateway: z.string(),
   instruction: z.string(),
-  enabled: z.boolean(),
-});
+})
+
+export const OpenClawReplyListenerConfigSchema = z.object({
+  discordBotToken: z.string().optional(),
+  discordChannelId: z.string().optional(),
+  discordMention: z.string().optional(), // For allowed_mentions
+  authorizedDiscordUserIds: z.array(z.string()).default([]),
+
+  telegramBotToken: z.string().optional(),
+  telegramChatId: z.string().optional(),
+
+  pollIntervalMs: z.number().default(3000),
+  rateLimitPerMinute: z.number().default(10),
+  maxMessageLength: z.number().default(500),
+  includePrefix: z.boolean().default(true),
+})
 
 export const OpenClawConfigSchema = z.object({
-  enabled: z.boolean(),
-  gateways: z.record(z.string(), OpenClawGatewayConfigSchema),
-  hooks: z
-    .object({
-      "session-start": OpenClawHookMappingSchema.optional(),
-      "session-end": OpenClawHookMappingSchema.optional(),
-      "session-idle": OpenClawHookMappingSchema.optional(),
-      "ask-user-question": OpenClawHookMappingSchema.optional(),
-      stop: OpenClawHookMappingSchema.optional(),
-    })
-    .strict()
-    .optional(),
-});
+  enabled: z.boolean().default(false),
 
-export type OpenClawConfig = z.infer<typeof OpenClawConfigSchema>;
+  // Outbound Configuration
+  gateways: z.record(z.string(), OpenClawGatewaySchema).default({}),
+  hooks: z.record(z.string(), OpenClawHookSchema).default({}),
+
+  // Inbound Configuration (Reply Listener)
+  replyListener: OpenClawReplyListenerConfigSchema.optional(),
+})
+
+export type OpenClawConfig = z.infer<typeof OpenClawConfigSchema>
+export type OpenClawGateway = z.infer<typeof OpenClawGatewaySchema>
+export type OpenClawHook = z.infer<typeof OpenClawHookSchema>
+export type OpenClawReplyListenerConfig = z.infer<typeof OpenClawReplyListenerConfigSchema>

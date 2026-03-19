@@ -51,15 +51,6 @@ export function applyToolConfig(params: {
     isCliRunMode ? "deny" :
     "allow";
 
-  const librarian = agentByKey(params.agentResult, "librarian");
-  if (librarian) {
-    librarian.permission = {
-      ...librarian.permission,
-      websearch: "allow",
-      "context7_*": "allow",
-      "grep_app_*": "allow",
-    };
-  }
   const looker = agentByKey(params.agentResult, "multimodal-looker");
   if (looker) {
     looker.permission = { ...looker.permission, task: "deny", look_at: "deny" };
