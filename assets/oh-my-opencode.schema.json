@@ -3695,6 +3695,19 @@
     "auto_update": {
       "type": "boolean"
     },
+    "atlas": {
+      "type": "object",
+      "properties": {
+        "single_task_directive_enabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "single_task_directive_enabled"
+      ],
+      "additionalProperties": false
+    },
     "skills": {
       "anyOf": [
         {

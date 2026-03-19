@@ -2,6 +2,7 @@ import { z } from "zod"
 import { AnyMcpNameSchema } from "../../mcp/types"
 import { BuiltinSkillNameSchema } from "./agent-names"
 import { AgentOverridesSchema } from "./agent-overrides"
+import { AtlasConfigSchema } from "./atlas"
 import { BabysittingConfigSchema } from "./babysitting"
 import { BackgroundTaskConfigSchema } from "./background-task"
 import { CategoriesConfigSchema } from "./categories"
@@ -44,6 +45,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   comment_checker: CommentCheckerConfigSchema.optional(),
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
+  atlas: AtlasConfigSchema.optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
   /**

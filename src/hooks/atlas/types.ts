@@ -9,6 +9,8 @@ export interface AtlasHookOptions {
   isContinuationStopped?: (sessionID: string) => boolean
   shouldSkipContinuation?: (sessionID: string) => boolean
   agentOverrides?: AgentOverrides
+  /** Inject single-task-only directive into delegated task prompts (default: true) */
+  singleTaskDirectiveEnabled?: boolean
   /** Enable auto-commit after each atomic task completion (default: true) */
   autoCommit?: boolean
 }

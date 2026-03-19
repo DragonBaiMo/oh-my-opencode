@@ -20,7 +20,11 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
 
   return {
     handler: createAtlasEventHandler({ ctx, options, sessions, getState }),
-    "tool.execute.before": createToolExecuteBeforeHandler({ ctx, pendingFilePaths }),
+    "tool.execute.before": createToolExecuteBeforeHandler({
+      ctx,
+      pendingFilePaths,
+      singleTaskDirectiveEnabled: options?.singleTaskDirectiveEnabled,
+    }),
     "tool.execute.after": createToolExecuteAfterHandler({ ctx, pendingFilePaths, autoCommit, getState }),
   }
 }

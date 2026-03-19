@@ -10,11 +10,12 @@ import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  singleTaskDirectiveEnabled?: boolean
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths } = input
+  const { ctx, pendingFilePaths, singleTaskDirectiveEnabled = true } = input
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
@@ -42,7 +43,7 @@ export function createToolExecuteBeforeHandler(input: {
     }
 
     // Check task - inject single-task directive
-    if (toolInput.tool === "task") {
+    if (toolInput.tool === "task" && singleTaskDirectiveEnabled) {
       const prompt = toolOutput.args.prompt as string | undefined
       if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
         toolOutput.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
