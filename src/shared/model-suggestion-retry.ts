@@ -155,9 +155,12 @@ export async function promptSyncWithModelSuggestionRetry(
       throw error
     }
 
+    const originalVariant = args.body.variant as string | undefined
+
     log("[model-suggestion-retry] Model not found, retrying with suggestion", {
-      original: `${suggestion.providerID}/${suggestion.modelID}`,
-      suggested: suggestion.suggestion,
+      original: `${args.body.model.providerID}/${args.body.model.modelID}`,
+      suggested: `${suggestion.providerID}/${suggestion.suggestion}`,
+      originalVariant,
     })
 
     const retryArgs: PromptArgs = {
@@ -168,6 +171,7 @@ export async function promptSyncWithModelSuggestionRetry(
           providerID: suggestion.providerID,
           modelID: suggestion.suggestion,
         },
+        ...(originalVariant ? { variant: originalVariant } : {}),
       },
     }
 
