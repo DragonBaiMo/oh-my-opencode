@@ -15,6 +15,7 @@ import {
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
 } from "../../shared"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
@@ -512,10 +513,12 @@ export class BackgroundManager {
       : undefined
     const launchVariant = input.model?.variant
 
+    const normalizedAgentName = getAgentDisplayName(input.agent)
+
     promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
       body: {
-        agent: input.agent,
+        agent: normalizedAgentName,
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
@@ -920,7 +923,11 @@ export class BackgroundManager {
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        const circuitBreaker = this.cachedCircuitBreakerSettings ?? (this.cachedCircuitBreakerSettings = resolveCircuitBreakerSettings(this.config))
+        let circuitBreaker = this.cachedCircuitBreakerSettings
+        if (!circuitBreaker) {
+          circuitBreaker = resolveCircuitBreakerSettings(this.config)
+          this.cachedCircuitBreakerSettings = circuitBreaker
+        }
         if (partInfo.tool) {
          task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,
