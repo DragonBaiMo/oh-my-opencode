@@ -1,3 +1,17 @@
+## 2026-03-21 upstream sync: merge upstream/dev into local dev
+
+- **魔改类型**: Override
+- **需求来源**: 上游同步批次 `upstream/dev (c3b23bf6..363661c0)`
+- **改动范围**: 整仓上游同步（merge commit）；无冲突，直接merge；本地未提交改动（`src/features/background-agent/manager.ts` 的 circuit breaker 缓存修复 + `getAgentDisplayName` agent name normalization）以 stash 形式保留并在 merge 后重新应用；本地 fork 护栏（`src/plugin-handlers/tool-config-handler.ts`）在合并中保持不变
+- **决策与理由**: 以 `upstream/dev` 为同步基线吸收上游修复（cli/run OPENCODE_CLIENT=run 修复、github-triage JSON 解析修复、todo-continuation-enforcer 增强），同时维持本地 fork 安全边界：外部研究工具默认 deny、保持内置 MCP 移除策略、浏览器验证路径维持 browser-tester
+- **验收结果**: 契约✓ 回归✓ 冒烟✓
+- **证据**:
+  - 关键字审计: `bunx rg -n "playwright|playwright-cli|agent-browser|dev-browser|browser_automation_engine|context7|grep_app|websearch" src assets` — 仅文档引用，无实现
+  - 回归测试: `bun test src/tools/delegate-task/browser-tester-skill-injection.test.ts src/features/builtin-skills/skills.test.ts src/mcp/index.test.ts src/config/schema.test.ts` (70 pass)
+  - 类型检查: `bun run typecheck` (pass)
+  - 构建: `bun run build` (pass)
+- **回滚**: `git revert -m 1 <merge-commit-hash>` 撤销本次 merge；同步前本地未提交改动通过 `git stash list` 中 `stash@{0}` 恢复
+
 ## 2026-03-19 upstream sync: merge upstream/dev into local dev
 
 - **魔改类型**: Override
