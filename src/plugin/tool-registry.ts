@@ -125,7 +125,7 @@ export function createToolRegistry(args: {
 
   const hashlineEnabled = pluginConfig.hashline_edit ?? false
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
-    ? { edit: createHashlineEditTool() }
+    ? { edit: createHashlineEditTool(ctx) }
     : {}
 
   const allTools: Record<string, ToolDefinition> = {
