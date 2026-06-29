@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hello-world": {
+      "command": "bun",
+      "args": ["run", "{{directory}}/index.ts"],
+      "env": {}
+    }
+  }
+}

@@ -89,7 +89,7 @@ discovered body`
     expect(result.content).toContain("Decision Record")
   })
 
-  test("injects deep-research script path placeholder automatically", async () => {
+  test("deep-research skill uses MCP-based invocation", async () => {
     //#when
     const result = await resolveSkillContent(["deep-research"], {
       targetAgent: "librarian",
@@ -97,7 +97,10 @@ discovered body`
 
     //#then
     expect(result.error).toBeNull()
-    expect(result.content).toContain("scripts/deep-research.mjs")
+    expect(result.content).toContain("skill_mcp")
+    expect(result.content).toContain("deep-research")
+    expect(result.content).toContain("research")
+    expect(result.content).toContain("mcp_name")
     expect(result.content).not.toContain("{{DEEP_RESEARCH_SCRIPT_PATH}}")
   })
 })

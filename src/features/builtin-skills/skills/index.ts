@@ -1,6 +1,7 @@
 export { frontendUiUxSkill } from "./frontend-ui-ux"
 export { gitMasterSkill } from "./git-master"
 export { deepResearchSkill } from "./deep-research"
+export { deepSearchSkill } from "./deep-search"
 export { browserTesterDevtoolsSkill } from "./browser-tester-devtools"
 export { requirementsEngineeringSkill } from "./requirements-engineering"
 export { contractDeliverySkill } from "./contract-delivery"

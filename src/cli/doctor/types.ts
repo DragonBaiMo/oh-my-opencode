@@ -127,10 +127,11 @@ export interface DependencyInfo {
 
 export interface McpServerInfo {
   id: string
-  type: "builtin" | "user"
+  type: "builtin" | "user" | "local"
   enabled: boolean
   valid: boolean
   error?: string
+  path?: string
 }
 
 export interface VersionCheckInfo {

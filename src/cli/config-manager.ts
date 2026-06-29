@@ -18,3 +18,6 @@ export { detectCurrentConfig } from "./config-manager/detect-current-config"
 
 export type { BunInstallResult } from "./config-manager/bun-install"
 export { runBunInstall, runBunInstallWithDetails } from "./config-manager/bun-install"
+
+export { ensureMcpServersDirectory } from "./config-manager/ensure-mcp-servers-directory"
+export { installMcpServerTemplates, getAvailableTemplates } from "./config-manager/mcp-server-template-installer"

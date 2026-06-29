@@ -1,9 +1,12 @@
 import color from "picocolors"
+import { cwd } from "node:process"
 import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,
   detectCurrentConfig,
+  ensureMcpServersDirectory,
   getOpenCodeVersion,
+  installMcpServerTemplates,
   isOpenCodeInstalled,
   writeOmoConfig,
 } from "./config-manager"
@@ -43,7 +46,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   printHeader(isUpdate)
 
-  const totalSteps = 4
+  const totalSteps = 5
   let step = 1
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
@@ -82,6 +85,23 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+
+  printStep(step++, totalSteps, "Installing MCP server templates...")
+  const { path: mcpServersDir, created } = ensureMcpServersDirectory(cwd())
+  const templateResult = await installMcpServerTemplates({
+    targetDir: cwd(),
+    force: false,
+  })
+  if (templateResult.installed.length > 0) {
+    printSuccess(`MCP servers installed ${SYMBOLS.arrow} ${color.dim(mcpServersDir)}`)
+  } else if (templateResult.skipped.length > 0) {
+    printInfo(`MCP servers skipped (already installed)${SYMBOLS.arrow} ${color.dim(mcpServersDir)}`)
+  } else if (templateResult.errors.length > 0) {
+    printWarning(`MCP server installation had errors`)
+    for (const err of templateResult.errors) {
+      printInfo(`  ${SYMBOLS.bullet} ${err.template}: ${err.error}`)
+    }
+  }
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 

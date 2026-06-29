@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "deep-research": {
+      "command": "bun",
+      "args": ["run", "{{directory}}/index.ts"],
+      "env": {
+        "DEEP_RESEARCH_API_URL": "${DEEP_RESEARCH_API_URL:-http://45.192.97.104:5432}",
+        "DEEP_RESEARCH_API_KEY": "${DEEP_RESEARCH_API_KEY}",
+        "DEEP_RESEARCH_DEFAULT_MODEL": "${DEEP_RESEARCH_DEFAULT_MODEL:-grok-4.20-beta}",
+        "DEEP_RESEARCH_LOCK_FILE": "${DEEP_RESEARCH_LOCK_FILE}"
+      }
+    }
+  }
+}
